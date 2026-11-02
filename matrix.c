@@ -15,6 +15,8 @@ static int lineGap;
 static bool english;
 static Color lineColor;
 static int colorVariation;
+static bool isRainbow = false;
+static bool isMonochrome = false;
 
 static const char* englishChars[] = {
     "a", "b", "c", "d", "e", "f", "g", "h",
@@ -78,6 +80,10 @@ static unsigned char randomizeColorComponent(unsigned char c) {
 }
 
 static Color randomizeColor(Color color) {
+    if (isMonochrome) {
+        const unsigned char v = randomizeColorComponent(color.r);
+        return (Color){v, v, v};
+    }
     return (Color){
         randomizeColorComponent(color.r),
         randomizeColorComponent(color.g),
@@ -123,7 +129,8 @@ static void lineDrawWhole(const Line* line) {
 static void lineDraw(const Line* line) {
     // Draw the character if inside the terminal.
     if (line->y < termSize.h && line->x < termSize.w) {
-        const Color color = randomizeColor(line->color);
+        Color color;
+        color = randomizeColor(line->color);
         printf(
             "\x1b[%u;%uH"
             "\x1b[38;2;%u;%u;%um"
@@ -150,10 +157,19 @@ static size_t lineNew(int x) {
         ;
     if (i >= linesAlloced) // No space
         return -1;
-    // Make new col
+    // Make new line
     const int l = lineLength + randGet(0, 4);
+    Color color;
+    if (isRainbow) {
+        color = (Color){randGet(0, 255), randGet(0, 255), randGet(0, 255)};
+    } else if (isMonochrome) {
+        const unsigned char v = randGet(0, 255);
+        color = (Color){v, v, v};
+    } else {
+        color = randomizeColor(lineColor);
+    }
     lines[i] = (Line){
-        true, x, 0, l, randomizeColor(lineColor)
+        true, x, 0, l, color
     };
     return i;
 }
@@ -251,19 +267,24 @@ static void handleSig(int sig) {
 }
 
 int main(int argc, char** argv) {
-    lineColor = (Color){100, 255, 100};
-    colorVariation = 60;
+    bool isHelp;
+    float frameDelay = 0.05;
     lineLength = 15;
     density = 0.5;
-    float frameDelay = 0.05;
-    bool isHelp;
+    isRainbow = false;
+    isMonochrome = false;
+    lineColor = (Color){100, 255, 100};
+    colorVariation = 60;
+    english = false;
     ArgparseParam params[] = {
         ARGPARSE_HELP(&isHelp),
-        ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
         ARGPARSE_FLOAT("-d", "--delay", &frameDelay, 0, 1),
-        ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
+        // ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
+        // ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
+        ARGPARSE_FLAG("-r", "--rainbow", &isRainbow),
+        ARGPARSE_FLAG("-m", "--monochrome", &isMonochrome),
         ARGPARSE_COLOR("-c", "--color", &lineColor),
-        ARGPARSE_INT(NULL, "--colorvariation", &colorVariation, 0, 255),
+        // ARGPARSE_INT(NULL, "--colorvariation", &colorVariation, 0, 255),
         ARGPARSE_FLAG(NULL, "--english", &english),
         ARGPARSE_END
     };
@@ -275,16 +296,23 @@ int main(int argc, char** argv) {
             "Show a fullscreen matrix style scrolling effect\n"
             "\n"
             "\t-h --help             Show this message\n"
+            "\t-r --rainbow          Make lines rainbow\n"
+            "\t-m --monochrome       Make lines monochrome\n"
             "\t-c --color <c>        Color of lines, e.g. #00ff00 or green (default #64ff64)\n"
             // "\t--colorvariation <i>  How much each color component can vary (default 30)\n"
             // "\t--linelength <i>      How long on average each line should be (default: 15)\n"
-            "\t -d --delay <f>       Delay in seconds between frames (default: 0.05)\n"
+            "\t-d --delay <f>        Delay in seconds between frames (default: 0.05)\n"
             // "\t--density <f>         Ratio of space that should be filled with lines (default 0.5)\n"
             "\t--english             Use english characters instead of japanese\n"
             "\n",
             argv[0]
         );
         return 0;
+    }
+
+    if (isRainbow && isMonochrome) {
+        fprintf(stderr, "Cannot be both rainbow and monochrome\n");
+        return 1;
     }
 
     // density = lineLength / (lineLength + lineGap)
