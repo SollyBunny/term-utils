@@ -81,4 +81,4 @@ typedef struct {
     ((ArgparseParam){shortName, longName, (void*)(int*)ptr, \
     ARGPARSE_TYPE_CHOICE, (ArgparseParamUnion){.c = (ArgparseParamChoice){choices}}})
 
-void argparse(int argc, char* const* argv, const ArgparseParam* params);
+void argparse(int argc, char* const* argv, const ArgparseParam* params, bool strict);

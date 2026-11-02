@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "argparse.h"
-#include "shared.h"
+#include "lib/argparse.h"
+#include "lib/term.h"
+#include "lib/rand.h"
 
 typedef ArgparseColor Color;
 
@@ -19,7 +20,7 @@ static int colorVariation;
 #define COLOR_MODE_NORMAL -1
 #define COLOR_MODE_RAINBOW 0
 #define COLOR_MODE_MONOCHROME 1
-#define COLOR_MODE_BASIC 1
+#define COLOR_MODE_BASIC 2
 static int colorMode;
 
 static const char* englishChars[] = {
@@ -170,10 +171,10 @@ static size_t lineNew(int x) {
     const int l = lineLength + randGet(0, 4);
     Color color;
     if (colorMode == COLOR_MODE_MONOCHROME) {
-        color = (Color){randGet(0, 255), randGet(0, 255), randGet(0, 255)};
-    } else if (colorMode == COLOR_MODE_RAINBOW) {
         const unsigned char v = randGet(0, 255);
         color = (Color){v, v, v};
+    } else if (colorMode == COLOR_MODE_RAINBOW) {
+        color = (Color){randGet(0, 255), randGet(0, 255), randGet(0, 255)};
     } else {
         color = lineColor;
     }
@@ -276,7 +277,7 @@ static void handleSig(int sig) {
 }
 
 int main(int argc, char** argv) {
-    bool isHelp;
+    bool isHelp = false;
     float frameDelay = 0.05;
     lineLength = 15;
     density = 0.5;
@@ -300,7 +301,7 @@ int main(int argc, char** argv) {
         ARGPARSE_END
     };
 
-    argparse(argc, argv, params);
+    argparse(argc, argv, params, true);
     if (isHelp) {
         printf(
             "Usage: %s ...\n"
@@ -331,6 +332,8 @@ int main(int argc, char** argv) {
         colorMode = COLOR_MODE_MONOCHROME;
     } else if (isColorModeBasic) {
         colorMode = COLOR_MODE_BASIC;
+    } else {
+        colorMode = COLOR_MODE_NORMAL;
     }
 
     // density = lineLength / (lineLength + lineGap)

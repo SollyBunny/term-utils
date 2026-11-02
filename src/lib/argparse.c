@@ -165,7 +165,7 @@ static bool parseColor(const char* value, ArgparseColor* color) {
     return parseColorName(value, color);
 }
 
-void argparse(int argc, char* const* argv, const ArgparseParam* params) {
+void argparse(int argc, char* const* argv, const ArgparseParam* params, bool strict) {
     size_t paramCount = 0;
     while (params[paramCount].type != ARGPARSE_TYPE_END)
         ++paramCount;
@@ -181,6 +181,8 @@ void argparse(int argc, char* const* argv, const ArgparseParam* params) {
         const ArgparseParam* param = findParam(params, arg);
 
         if (!param) {
+            if (!strict)
+                continue;
             fprintf(stderr, "Unrecognised parameter: %s\n", arg);
             error = true;
             continue;

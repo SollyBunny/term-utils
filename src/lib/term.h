@@ -19,6 +19,3 @@ TermSize* termSizeUpdate();
 
 // Waits for the terminal to be moved into the FG
 bool termWaitForUnpause();
-
-void randInit();
-int randGet(int min, int max);
