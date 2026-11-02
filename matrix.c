@@ -252,19 +252,19 @@ static void handleSig(int sig) {
 
 int main(int argc, char** argv) {
     lineColor = (Color){100, 255, 100};
-    colorVariation = 30;
+    colorVariation = 60;
     lineLength = 15;
     density = 0.5;
-    float secondsPerFrame = 0.05;
+    float frameDelay = 0.05;
     bool isHelp;
     ArgparseParam params[] = {
         ARGPARSE_HELP(&isHelp),
-        ARGPARSE_FLAG(NULL, "--english", &english),
         ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
-        ARGPARSE_FLOAT(NULL, "--wait", &secondsPerFrame, 0, 1),
+        ARGPARSE_FLOAT("-d", "--delay", &frameDelay, 0, 1),
         ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
-        ARGPARSE_COLOR(NULL, "--color", &lineColor),
+        ARGPARSE_COLOR("-c", "--color", &lineColor),
         ARGPARSE_INT(NULL, "--colorvariation", &colorVariation, 0, 255),
+        ARGPARSE_FLAG(NULL, "--english", &english),
         ARGPARSE_END
     };
 
@@ -275,12 +275,12 @@ int main(int argc, char** argv) {
             "Show a fullscreen matrix style scrolling effect\n"
             "\n"
             "\t-h --help             Show this message\n"
-            "\t--color <c>        Color of lines, e.g. #00ff00 or green (default #64ff64)\n"
-            "\t--colorvariation <i>  How much each color component can vary (default 30)\n"
+            "\t-c --color <c>        Color of lines, e.g. #00ff00 or green (default #64ff64)\n"
+            // "\t--colorvariation <i>  How much each color component can vary (default 30)\n"
+            // "\t--linelength <i>      How long on average each line should be (default: 15)\n"
+            "\t -d --delay <f>       Delay in seconds between frames (default: 0.05)\n"
+            // "\t--density <f>         Ratio of space that should be filled with lines (default 0.5)\n"
             "\t--english             Use english characters instead of japanese\n"
-            "\t--linelength <i>      How long on average each line should be (default: 15)\n"
-            "\t--wait <f>         Seconds to wait between frames (default: 0.05)\n"
-            "\t--density <f>         Ratio of space that should be filled with lines (default 0.5)\n"
             "\n",
             argv[0]
         );
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
         fillCol(x);
     fflush(stdout);
     while (true) {
-        usleep((unsigned int)(1e6 * secondsPerFrame));
+        usleep((unsigned int)(1e6 * frameDelay));
         if (interrupted)
             break;
         if (termWaitForUnpause())
@@ -306,7 +306,7 @@ int main(int argc, char** argv) {
         const char c = termReadNonblock();
         if (c == ' ') {
             while (termReadNonblock() != ' ')
-                usleep((unsigned int)(1e6 * secondsPerFrame / 2));
+                usleep((unsigned int)(1e6 * frameDelay / 2));
         } else if (c == 'j') {
             english = !english;
             redrawAll();
