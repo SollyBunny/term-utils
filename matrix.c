@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
     isRainbow = false;
     isMonochrome = false;
     lineColor = (Color){100, 255, 100};
-    colorVariation = 60;
+    colorVariation = 40;
     english = false;
     ArgparseParam params[] = {
         ARGPARSE_HELP(&isHelp),
