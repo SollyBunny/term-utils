@@ -15,8 +15,12 @@ static int lineGap;
 static bool english;
 static Color lineColor;
 static int colorVariation;
-static bool isRainbow = false;
-static bool isMonochrome = false;
+
+#define COLOR_MODE_NORMAL -1
+#define COLOR_MODE_RAINBOW 0
+#define COLOR_MODE_MONOCHROME 1
+#define COLOR_MODE_BASIC 1
+static int colorMode;
 
 static const char* englishChars[] = {
     "a", "b", "c", "d", "e", "f", "g", "h",
@@ -80,7 +84,7 @@ static unsigned char randomizeColorComponent(unsigned char c) {
 }
 
 static Color randomizeColor(Color color) {
-    if (isMonochrome) {
+    if (colorMode == COLOR_MODE_MONOCHROME) {
         const unsigned char v = randomizeColorComponent(color.r);
         return (Color){v, v, v};
     }
@@ -105,6 +109,30 @@ static void lineSim(Line* line) {
         line->active = false;
 }
 
+static void lineDrawDot(const Line* line, int x, int y) {
+    if (colorMode == COLOR_MODE_BASIC) {
+        int color = randGet(0, 1) > 0 ? randGet(32, 36) : randGet(92, 96);
+        printf(
+            "\x1b[%u;%uH"
+            "\x1b[%dm"
+            "%s",
+            y + 1, x + 1,
+            color,
+            randomChar()
+        );
+    } else {
+        const Color color = randomizeColor(line->color);
+        printf(
+            "\x1b[%u;%uH"
+            "\x1b[38;2;%u;%u;%um"
+            "%s",
+            y + 1, x + 1,
+            (unsigned)color.r, (unsigned)color.g, (unsigned)color.b,
+            randomChar()
+        );
+    }
+}
+
 // Draw the whole line
 static void lineDrawWhole(const Line* line) {
     const int yStart =
@@ -112,34 +140,15 @@ static void lineDrawWhole(const Line* line) {
     const int yEnd =
         line->y >= line->l ? line->y - line->l : 0;
 
-    for (int y = yStart; y >= yEnd; --y) {
-        const Color color = randomizeColor(line->color);
-        printf(
-            "\x1b[%u;%uH"
-            "\x1b[38;2;%u;%u;%um"
-            "%s",
-            y + 1, line->x + 1,
-            (unsigned)color.r, (unsigned)color.g, (unsigned)color.b,
-            randomChar()
-        );
-    }
+    for (int y = yStart; y >= yEnd; --y)
+        lineDrawDot(line, line->x, y);
 }
 
 // Draw just the head and clear the tail
 static void lineDraw(const Line* line) {
     // Draw the character if inside the terminal.
-    if (line->y < termSize.h && line->x < termSize.w) {
-        Color color;
-        color = randomizeColor(line->color);
-        printf(
-            "\x1b[%u;%uH"
-            "\x1b[38;2;%u;%u;%um"
-            "%s",
-            line->y + 1, line->x + 1,
-            (unsigned)color.r, (unsigned)color.g, (unsigned)color.b,
-            randomChar()
-        );
-    }
+    if (line->y < termSize.h && line->x < termSize.w)
+        lineDrawDot(line, line->x, line->y);
 
     if (line->y >= line->l && line->y - line->l < termSize.h) {
         printf(
@@ -160,13 +169,13 @@ static size_t lineNew(int x) {
     // Make new line
     const int l = lineLength + randGet(0, 4);
     Color color;
-    if (isRainbow) {
+    if (colorMode == COLOR_MODE_MONOCHROME) {
         color = (Color){randGet(0, 255), randGet(0, 255), randGet(0, 255)};
-    } else if (isMonochrome) {
+    } else if (colorMode == COLOR_MODE_RAINBOW) {
         const unsigned char v = randGet(0, 255);
         color = (Color){v, v, v};
     } else {
-        color = randomizeColor(lineColor);
+        color = lineColor;
     }
     lines[i] = (Line){
         true, x, 0, l, color
@@ -271,18 +280,20 @@ int main(int argc, char** argv) {
     float frameDelay = 0.05;
     lineLength = 15;
     density = 0.5;
-    isRainbow = false;
-    isMonochrome = false;
+    bool isColorModeRainbow = false;
+    bool isColorModeMonochrome = false;
+    bool isColorModeBasic = false;
     lineColor = (Color){100, 255, 100};
-    colorVariation = 40;
+    colorVariation = 20;
     english = false;
     ArgparseParam params[] = {
         ARGPARSE_HELP(&isHelp),
         ARGPARSE_FLOAT("-d", "--delay", &frameDelay, 0, 1),
         // ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
         // ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
-        ARGPARSE_FLAG("-r", "--rainbow", &isRainbow),
-        ARGPARSE_FLAG("-m", "--monochrome", &isMonochrome),
+        ARGPARSE_FLAG("-r", "--rainbow", &isColorModeRainbow),
+        ARGPARSE_FLAG("-m", "--monochrome", &isColorModeMonochrome),
+        ARGPARSE_FLAG("-b", "--basic", &isColorModeBasic),
         ARGPARSE_COLOR("-c", "--color", &lineColor),
         // ARGPARSE_INT(NULL, "--colorvariation", &colorVariation, 0, 255),
         ARGPARSE_FLAG(NULL, "--english", &english),
@@ -296,8 +307,9 @@ int main(int argc, char** argv) {
             "Show a fullscreen matrix style scrolling effect\n"
             "\n"
             "\t-h --help             Show this message\n"
-            "\t-r --rainbow          Make lines rainbow\n"
-            "\t-m --monochrome       Make lines monochrome\n"
+            "\t-r --rainbow          Use rainbow colors\n"
+            "\t-m --monochrome       Use monochrome colors\n"
+            "\t-b --basic            Only use the 16 basic colors\n"
             "\t-c --color <c>        Color of lines, e.g. #00ff00, green, or 255,0,0 (default #64ff64)\n"
             // "\t--colorvariation <i>  How much each color component can vary (default 30)\n"
             // "\t--linelength <i>      How long on average each line should be (default: 15)\n"
@@ -310,9 +322,15 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    if (isRainbow && isMonochrome) {
-        fprintf(stderr, "Cannot be both rainbow and monochrome\n");
+    if (isColorModeRainbow + isColorModeMonochrome + isColorModeBasic > 1) {
+        fprintf(stderr, "Only one of -r, -m or -b can be specified\n");
         return 1;
+    } else if (isColorModeRainbow) {
+        colorMode = COLOR_MODE_RAINBOW;
+    } else if (isColorModeMonochrome) {
+        colorMode = COLOR_MODE_MONOCHROME;
+    } else if (isColorModeBasic) {
+        colorMode = COLOR_MODE_BASIC;
     }
 
     // density = lineLength / (lineLength + lineGap)
