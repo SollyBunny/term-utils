@@ -262,6 +262,34 @@ void argparse(int argc, char* const* argv, const ArgparseParam* params) {
                 break;
             }
 
+            case ARGPARSE_TYPE_CHOICE: {
+                const char* const* choices = param->data.c.choices;
+                int index = 0;
+                bool found = false;
+
+                if (choices) {
+                    for (const char* const* c = choices; *c; ++c) {
+                        if (strcmp(*c, value) == 0) {
+                            found = true;
+                            break;
+                        }
+                        ++index;
+                    }
+                }
+
+                if (!found) {
+                    fprintf(stderr,
+                        "Invalid choice for %s: %s\n",
+                        arg, value
+                    );
+                    error = true;
+                    break;
+                }
+
+                *(int*)param->ptr = index;
+                break;
+            }
+
             default:
                 fprintf(stderr, "Unknown parameter type: %d\n", param->type);
                 error = true;
