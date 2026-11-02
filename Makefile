@@ -1,9 +1,15 @@
-CFLAGS = -Wall -Wextra -Wpedantic -fsanitize=address -g -fno-omit-frame-pointer
+CFLAGS = -Wall -Wextra -Wpedantic
+# CFLAGS += -fsanitize=address -g -fno-omit-frame-pointer
+CFLAGS += -O3
 
-all: matrix lolcat
+build: matrix lolcat
 
 matrix: src/matrix.c src/lib/term.* src/lib/rand.* src/lib/argparse.*
 	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
 
 lolcat: src/lolcat.c src/lib/term.* src/lib/rand.* src/lib/argparse.*
 	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
+
+install: build
+	cp matrix /usr/local/bin/matrix
+	cp lolcat /usr/local/bin/lolcat
