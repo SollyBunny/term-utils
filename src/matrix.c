@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -174,7 +175,12 @@ static size_t lineNew(int x) {
         const unsigned char v = randGet(0, 255);
         color = (Color){v, v, v};
     } else if (colorMode == COLOR_MODE_RAINBOW) {
-        color = (Color){randGet(0, 255), randGet(0, 255), randGet(0, 255)};
+        const double pos = (double)randGet(0, 2048) / 2048 * M_PI * 2;
+        color = (Color){
+            (int)(sin(pos) * 127 + 128),
+            (int)(sin(pos + 2 * M_PI / 3) * 127 + 128),
+            (int)(sin(pos + 4 * M_PI / 3) * 127 + 128)
+        };
     } else {
         color = lineColor;
     }
