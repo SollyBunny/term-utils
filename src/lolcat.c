@@ -12,6 +12,7 @@
 static int colorMode;
 static bool colorRandom;
 static bool colorInvert;
+static bool drawBold;
 
 static int colorsBasic(int i) {
     static int colors[] = {
@@ -48,7 +49,10 @@ static void printChunk(const char* s, size_t n) {
                 x += 4;
                 break;
             case '\n':
-                fputs("\x1b[0m\n", stdout);
+                if (drawBold)
+                    fputs("\x1b[0m\n\x1b[1m", stdout);
+                else
+                    fputs("\x1b[0m\n", stdout);
                 x = 0;
                 ++y;
                 break;
@@ -73,7 +77,7 @@ static void printChunk(const char* s, size_t n) {
     }
 }
 
-static void reset() {
+static void printReset() {
     fputs("\x1b[0m", stdout);
     fflush(stdout);
 }
@@ -107,12 +111,14 @@ int main(int argc, char** argv) {
     bool isColorModeMonochrome = false;
     colorRandom = false;
     colorInvert = false;
+    drawBold = false;
     ArgparseParam params[] = {
         ARGPARSE_HELP(&isHelp),
         ARGPARSE_FLAG("-b", "--basic", &isColorModeBasic),
         ARGPARSE_FLAG("-m", "--monochrome", &isColorModeMonochrome),
         ARGPARSE_FLAG("-r", "--random", &colorRandom),
         ARGPARSE_FLAG("-i", "--invert", &colorInvert),
+        ARGPARSE_FLAG(NULL, "--bold", &drawBold),
         ARGPARSE_END
     };
 
@@ -132,6 +138,9 @@ int main(int argc, char** argv) {
     if (colorRandom)
         randInit();
 
+    if (drawBold)
+        fputs("\x1b[1m", stdout);
+
     if (isHelp) {
         const char help[] = "Usage: lolcat ... [FILE]\n"
             "ConCATenate files or stdin to stdout with colors!\n"
@@ -142,9 +151,10 @@ int main(int argc, char** argv) {
             "\t-m --monochrome       Use monochrome colors\n"
             "\t-r --random           Use colors in a random order\n"
             "\t-i --invert           Invert fg and bg\n"
+            "\t--bold                Use bold\n"
             "\n";
         printChunk(help, sizeof(help));
-        reset();
+        printReset();
         return 0;
     }
 
@@ -153,7 +163,10 @@ int main(int argc, char** argv) {
         bool isParam = false;
 
         for (ArgparseParam *param = params; param->type != ARGPARSE_TYPE_END; ++param) {
-            if (strcmp(argv[i], param->shortName) == 0 || strcmp(argv[i], param->longName) == 0) {
+            if (
+                (param->shortName && strcmp(argv[i], param->shortName) == 0) ||
+                (param->longName && strcmp(argv[i], param->longName) == 0)
+            ) {
                 isParam = true;
                 break;
             }
@@ -169,6 +182,6 @@ int main(int argc, char** argv) {
     if (!hasArg)
         doFile(NULL);
 
-    reset();
+    printReset();
     return 0;
 }
