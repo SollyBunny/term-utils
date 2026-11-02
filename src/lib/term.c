@@ -19,14 +19,15 @@ void __asan_on_error() {
 }
 #endif
 
-static volatile atomic_bool termResized = true;
-static volatile atomic_bool termPaused = false;
+atomic_bool termInterrupted = false;
+static atomic_bool termResized = true;
+static atomic_bool termPaused = false;
 _Static_assert(ATOMIC_BOOL_LOCK_FREE == 2, "atomic_bool must always be lock-free");
 
 static struct termios termiosOriginal = {};
+static struct termios termiosCurrent = {};
 static bool termInited = false;
 static char* termBuffer = NULL;
-static void (*termHandleSig)(int);
 
 static void handleSignal(int sig) {
     switch (sig) {
@@ -36,8 +37,7 @@ static void handleSignal(int sig) {
         case SIGINT:
         case SIGTERM:
         case SIGQUIT:
-            if (termHandleSig)
-                termHandleSig(sig);
+            termInterrupted = true;
             break;
         case SIGTSTP:
             termPaused = true;
@@ -45,25 +45,24 @@ static void handleSignal(int sig) {
     }
 }
 
-void termInit(void (*handleSig)(int)) {
+void termInit() {
     if (termInited) {
         fputs("Inited term twice\n", stderr);
         return;
     }
     termInited = true;
-    termHandleSig = handleSig;
 
     // Setup handlers
     struct sigaction sa = {0};
     sa.sa_handler = handleSignal;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    signal(SIGWINCH, handleSignal);
-    signal(SIGINT, handleSignal);
-    signal(SIGTERM, handleSignal);
-    signal(SIGQUIT, handleSignal);
-    signal(SIGTSTP, handleSignal);
-    signal(SIGCONT, handleSignal);
+    sigaction(SIGWINCH, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGTSTP, &sa, NULL);
+    sigaction(SIGCONT, &sa, NULL);
 
     // Setup big stdout buffer
     termBuffer = malloc(1024 * 1024);
@@ -80,7 +79,6 @@ void termInit(void (*handleSig)(int)) {
     fflush(stdout);
 
 	tcgetattr(STDIN_FILENO, &termiosOriginal);
-    struct termios termiosCurrent;
 	tcgetattr(STDIN_FILENO, &termiosCurrent);
 	// Immediate input, No echo
 	termiosCurrent.c_lflag &= ~(ICANON|ECHO);
@@ -114,14 +112,19 @@ void termDestroy() {
         free(termBuffer);
 }
 
-char termReadNonblock() {
-    char c;
-    ssize_t n = read(STDIN_FILENO, &c, 1);
-    return n == 1 ? c : 0;
+void termReadSetBlocking(bool blocking) {
+    if (!termInited) {
+        fprintf(stderr, "Tried to set blocking when not inited");
+        return;
+    }
+    termiosCurrent.c_cc[VMIN] = blocking ? 1 : 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &termiosCurrent);
 }
 
 char termRead() {
-    return getchar();
+    char c;
+    ssize_t n = read(STDIN_FILENO, &c, 1);
+    return n == 1 ? c : 0;
 }
 
 static TermSize termSize = {-1, -1};
@@ -150,7 +153,7 @@ bool termWaitForUnpause() {
     raise(SIGSTOP);
 
     if (!termInited)
-        termInit(termHandleSig);
+        termInit();
 
     return true;
 }

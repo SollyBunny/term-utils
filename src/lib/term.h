@@ -1,10 +1,14 @@
 #pragma once
 
+#include <stdatomic.h>
 #include <stdbool.h>
 
-void termInit(void (*handleSig)(int));
+extern atomic_bool termInterrupted;
+
+void termInit();
 void termDestroy();
-char termReadNonblock();
+char termRead();
+void termReadSetBlocking(bool blocking);
 
 typedef struct {
     int w;

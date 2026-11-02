@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "lib/argparse.h"
@@ -267,19 +268,36 @@ static void handleResize() {
     fflush(stdout);
 }
 
-static volatile atomic_bool interrupted = false;
-
 static void destroy() {
     termDestroy();
     free(lines);
     free(lineGaps);
 }
 
-static void handleSig(int sig) {
-    (void)sig;
-    if (interrupted)
-        return;
-    interrupted = true;
+
+static struct timespec sleepStableNext = {};
+// Wait until at least [seconds] seconds to pass since the last [usleepStable] call
+static void sleepStable(float seconds)
+{
+    if (sleepStableNext.tv_sec == 0 && sleepStableNext.tv_nsec == 0)
+        clock_gettime(CLOCK_MONOTONIC, &sleepStableNext);
+
+    long ns = (long)(seconds * 1e9);
+
+    sleepStableNext.tv_sec += ns / 1000000000L;
+    sleepStableNext.tv_nsec += ns % 1000000000L;
+
+    if (sleepStableNext.tv_nsec >= 1000000000L) {
+        sleepStableNext.tv_sec++;
+        sleepStableNext.tv_nsec -= 1000000000L;
+    }
+
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &sleepStableNext, NULL) != 0 && !termInterrupted)
+        ;
+}
+
+static void sleepStableReset() {
+    sleepStableNext = (struct timespec){};
 }
 
 int main(int argc, char** argv) {
@@ -343,30 +361,45 @@ int main(int argc, char** argv) {
     }
 
     // density = lineLength / (lineLength + lineGap)
-    lineGap = (lineLength / density) - lineLength;
+    lineGap = ((float)lineLength / density) - lineLength;
+    if (lineGap < 1)
+        lineGap = 1;
 
     randInit();
-    termInit(handleSig);
+    termInit();
     // Predraw so we start not blank
     handleResize();
     for (int x = 0; x < termSize.w; ++x)
         fillCol(x);
     fflush(stdout);
+
+    bool paused = false;
     while (true) {
-        usleep((unsigned int)(1e6 * frameDelay));
-        if (interrupted)
+        if (!paused)
+            sleepStable(frameDelay);
+        if (termInterrupted)
             break;
-        if (termWaitForUnpause())
+        if (termWaitForUnpause()) {
             redrawAll();
-        const char c = termReadNonblock();
+            sleepStableReset();
+        }
+        const char c = termRead();
         if (c == ' ') {
-            while (termReadNonblock() != ' ')
-                usleep((unsigned int)(1e6 * frameDelay / 2));
+            if (paused) {
+                paused = false;
+                termReadSetBlocking(false);
+                sleepStableReset();
+            } else {
+                paused = true;
+                termReadSetBlocking(true);
+            }
         } else if (c == 'j') {
             english = !english;
             redrawAll();
         }
         handleResize();
+        if (paused)
+            continue;
         for (int x = 0; x < termSize.w; ++x) {
             if (lineGaps[x] > lineGap && randGet(0, 1) == 1) {
                 const size_t index = lineNew(x);
