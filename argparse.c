@@ -95,7 +95,7 @@ static bool parseDecimalColor(const char* value, ArgparseColor* color) {
         components[i] = component;
 
         if (i < 2) {
-            if (*value != ',')
+            if (*value != ',' && *value != ';')
                 return false;
             ++value;
         }
