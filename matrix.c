@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
             "\t-h --help             Show this message\n"
             "\t-r --rainbow          Make lines rainbow\n"
             "\t-m --monochrome       Make lines monochrome\n"
-            "\t-c --color <c>        Color of lines, e.g. #00ff00 or green (default #64ff64)\n"
+            "\t-c --color <c>        Color of lines, e.g. #00ff00, green, or 255,0,0 (default #64ff64)\n"
             // "\t--colorvariation <i>  How much each color component can vary (default 30)\n"
             // "\t--linelength <i>      How long on average each line should be (default: 15)\n"
             "\t-d --delay <f>        Delay in seconds between frames (default: 0.05)\n"

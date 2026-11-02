@@ -77,6 +77,41 @@ static bool parseHexColor(const char* value, ArgparseColor* color) {
     return false;
 }
 
+static bool parseDecimalColor(const char* value, ArgparseColor* color) {
+    unsigned components[3];
+
+    for (int i = 0; i < 3; ++i) {
+        if (*value < '0' || *value > '9')
+            return false;
+
+        unsigned component = 0;
+        while (*value >= '0' && *value <= '9') {
+            component = component * 10 + (unsigned)(*value - '0');
+            if (component > 255)
+                return false;
+            ++value;
+        }
+
+        components[i] = component;
+
+        if (i < 2) {
+            if (*value != ',')
+                return false;
+            ++value;
+        }
+    }
+
+    if (*value != '\0')
+        return false;
+
+    *color = (ArgparseColor){
+        (unsigned char)components[0],
+        (unsigned char)components[1],
+        (unsigned char)components[2]
+    };
+    return true;
+}
+
 static bool parseColorName(const char* value, ArgparseColor* color) {
     static const struct {
         const char* name;
@@ -124,6 +159,8 @@ static bool parseColorName(const char* value, ArgparseColor* color) {
 
 static bool parseColor(const char* value, ArgparseColor* color) {
     if (parseHexColor(value, color))
+        return true;
+    if (parseDecimalColor(value, color))
         return true;
     return parseColorName(value, color);
 }
