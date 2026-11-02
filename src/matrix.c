@@ -333,7 +333,7 @@ int main(int argc, char** argv) {
             "\n"
             "\t-h --help             Show this message\n"
             "\t-r --rainbow          Use rainbow colors\n"
-            "\t-m --monochrome       Use monochrome colors\n"
+            "\t-m --monochrome       Use only black and white\n"
             "\t-b --basic            Only use the 16 basic colors\n"
             "\t-c --color <c>        Color of lines, e.g. #00ff00, green, or 255,0,0 (default #64ff64)\n"
             // "\t--colorvariation <i>  How much each color component can vary (default 30)\n"

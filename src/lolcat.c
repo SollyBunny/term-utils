@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
             "\n"
             "\t-h --help             Show this message\n"
             "\t-b --basic            Use only basic 256 colors\n"
-            "\t-m --monochrome       Use monochrome colors\n"
+            "\t-m --monochrome       Use only black and white\n"
             "\t-r --random           Use colors in a random order\n"
             "\t-i --invert           Invert fg and bg\n"
             "\t--bold                Use bold\n"
