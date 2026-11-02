@@ -175,7 +175,8 @@ static size_t lineNew(int x) {
         const unsigned char v = randGet(0, 255);
         color = (Color){v, v, v};
     } else if (colorMode == COLOR_MODE_RAINBOW) {
-        const double pos = (double)randGet(0, 2048) / 2048 * M_PI * 2;
+        // const double pos = (double)randGet(0, 2048) / 2048 * M_PI * 2; // Actually random
+        const double pos = (double)x / (double)termSize.w * M_PI * 2 + ((double)(randGet(0, 64) - 32) / 128);
         color = (Color){
             (int)(sin(pos) * 127 + 128),
             (int)(sin(pos + 2 * M_PI / 3) * 127 + 128),
