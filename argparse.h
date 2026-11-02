@@ -21,6 +21,10 @@ typedef struct {
     float max;
 } ArgparseParamFloat;
 
+typedef struct {
+    unsigned char r, g, b;
+} ArgparseColor;
+
 typedef union {
     ArgparseParamNone n;
     ArgparseParamString s;
@@ -41,6 +45,7 @@ typedef struct {
 #define ARGPARSE_TYPE_STRING 1
 #define ARGPARSE_TYPE_INT 2
 #define ARGPARSE_TYPE_FLOAT 3
+#define ARGPARSE_TYPE_COLOR 4
 
 #define ARGPARSE_END ((ArgparseParam){NULL, NULL, NULL, ARGPARSE_TYPE_END, (ArgparseParamUnion){.n = (ArgparseParamNone){}}})
 
@@ -61,5 +66,9 @@ typedef struct {
 #define ARGPARSE_FLOAT(shortName, longName, ptr, min, max) \
     ((ArgparseParam){shortName, longName, (void*)(float*)ptr, \
     ARGPARSE_TYPE_FLOAT, (ArgparseParamUnion){.f = (ArgparseParamFloat){min, max}}})
+
+#define ARGPARSE_COLOR(shortName, longName, ptr) \
+    ((ArgparseParam){shortName, longName, (void*)(ArgparseColor*)ptr, \
+    ARGPARSE_TYPE_COLOR, (ArgparseParamUnion){.n = (ArgparseParamNone){}}})
 
 void argparse(int argc, char* const* argv, const ArgparseParam* params);

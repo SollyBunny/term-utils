@@ -23,6 +23,111 @@ static const ArgparseParam* findParam(
     return NULL;
 }
 
+static int hexDigit(char c) {
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    return -1;
+}
+
+static bool parseHexColor(const char* value, ArgparseColor* color) {
+    if (*value == '#')
+        ++value;
+
+    const size_t length = strlen(value);
+
+    if (length == 3) {
+        const int r = hexDigit(value[0]);
+        const int g = hexDigit(value[1]);
+        const int b = hexDigit(value[2]);
+
+        if (r < 0 || g < 0 || b < 0)
+            return false;
+
+        *color = (ArgparseColor){
+            (unsigned char)(r * 17),
+            (unsigned char)(g * 17),
+            (unsigned char)(b * 17)
+        };
+        return true;
+    }
+
+    if (length == 6) {
+        const int r1 = hexDigit(value[0]);
+        const int r2 = hexDigit(value[1]);
+        const int g1 = hexDigit(value[2]);
+        const int g2 = hexDigit(value[3]);
+        const int b1 = hexDigit(value[4]);
+        const int b2 = hexDigit(value[5]);
+
+        if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0)
+            return false;
+
+        *color = (ArgparseColor){
+            (unsigned char)(r1 * 16 + r2),
+            (unsigned char)(g1 * 16 + g2),
+            (unsigned char)(b1 * 16 + b2)
+        };
+        return true;
+    }
+
+    return false;
+}
+
+static bool parseColorName(const char* value, ArgparseColor* color) {
+    static const struct {
+        const char* name;
+        ArgparseColor color;
+    } colors[] = {
+        {"red", {255, 0, 0}},
+        {"orange", {255, 165, 0}},
+        {"yellow", {255, 255, 0}},
+        {"green", {0, 255, 0}},
+        {"blue", {0, 0, 255}},
+        {"purple", {128, 0, 128}},
+        {"black", {0, 0, 0}},
+        {"white", {255, 255, 255}},
+        {"magenta", {255, 0, 255}}
+    };
+
+    for (size_t i = 0; i < sizeof(colors) / sizeof(*colors); ++i) {
+        const char* a = value;
+        const char* b = colors[i].name;
+
+        while (*a && *b) {
+            char ca = *a;
+            char cb = *b;
+
+            if (ca >= 'A' && ca <= 'Z')
+                ca += 'a' - 'A';
+            if (cb >= 'A' && cb <= 'Z')
+                cb += 'a' - 'A';
+
+            if (ca != cb)
+                break;
+
+            ++a;
+            ++b;
+        }
+
+        if (*a == '\0' && *b == '\0') {
+            *color = colors[i].color;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool parseColor(const char* value, ArgparseColor* color) {
+    if (parseHexColor(value, color))
+        return true;
+    return parseColorName(value, color);
+}
+
 void argparse(int argc, char* const* argv, const ArgparseParam* params) {
     size_t paramCount = 0;
     while (params[paramCount].type != ARGPARSE_TYPE_END)
@@ -138,6 +243,22 @@ void argparse(int argc, char* const* argv, const ArgparseParam* params) {
                 }
 
                 *(float*)param->ptr = result;
+                break;
+            }
+
+            case ARGPARSE_TYPE_COLOR: {
+                ArgparseColor color;
+
+                if (!parseColor(value, &color)) {
+                    fprintf(stderr,
+                        "Invalid color for %s: %s\n",
+                        arg, value
+                    );
+                    error = true;
+                    break;
+                }
+
+                *(ArgparseColor*)param->ptr = color;
                 break;
             }
 

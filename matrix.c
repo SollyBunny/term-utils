@@ -7,10 +7,14 @@
 #include "argparse.h"
 #include "shared.h"
 
+typedef ArgparseColor Color;
+
 static float density;
 static int lineLength;
 static int lineGap;
 static bool english;
+static Color lineColor;
+static int colorVariation;
 
 static const char* englishChars[] = {
     "a", "b", "c", "d", "e", "f", "g", "h",
@@ -52,10 +56,6 @@ static const char* japaneseChars[] = {
 };
 
 typedef struct {
-    unsigned char r, g, b;
-} Color;
-
-typedef struct {
     bool active; // Should this col be simulated
     int x, y, l; // x, y pos of head and l length of tail
     Color color; // Avg color of head
@@ -68,7 +68,7 @@ static Line* lines = NULL;
 static int* lineGaps = NULL;
 
 static unsigned char randomizeColorComponent(unsigned char c) {
-    int delta = randGet(-15, 15);
+    int delta = randGet(-colorVariation / 2, colorVariation / 2);
     int result = c + delta;
 
     if (result < 0) result = 0;
@@ -153,7 +153,7 @@ static size_t lineNew(int x) {
     // Make new col
     const int l = lineLength + randGet(0, 4);
     lines[i] = (Line){
-        true, x, 0, l, (Color){100, 255, 100}
+        true, x, 0, l, randomizeColor(lineColor)
     };
     return i;
 }
@@ -251,6 +251,8 @@ static void handleSig(int sig) {
 }
 
 int main(int argc, char** argv) {
+    lineColor = (Color){100, 255, 100};
+    colorVariation = 30;
     lineLength = 15;
     density = 0.5;
     float secondsPerFrame = 0.05;
@@ -261,6 +263,8 @@ int main(int argc, char** argv) {
         ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
         ARGPARSE_FLOAT(NULL, "--wait", &secondsPerFrame, 0, 1),
         ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
+        ARGPARSE_COLOR(NULL, "--color", &lineColor),
+        ARGPARSE_INT(NULL, "--colorvariation", &colorVariation, 0, 255),
         ARGPARSE_END
     };
 
@@ -270,11 +274,13 @@ int main(int argc, char** argv) {
             "Usage: %s ...\n"
             "Show a fullscreen matrix style scrolling effect\n"
             "\n"
-            "\t-h --help         Show this message\n"
-            "\t--english         Use english characters instead of japanese\n"
-            "\t--linelength <i>  How long on average each line should be (default: 15)\n"
-            "\t--wait <f>        Seconds to wait between frames (default: 0.05)\n"
-            "\t--density <f>     Ratio of space that should be filled with lines (default 0.5)\n"
+            "\t-h --help             Show this message\n"
+            "\t--color <c>        Color of lines, e.g. #00ff00 or green (default #64ff64)\n"
+            "\t--colorvariation <i>  How much each color component can vary (default 30)\n"
+            "\t--english             Use english characters instead of japanese\n"
+            "\t--linelength <i>      How long on average each line should be (default: 15)\n"
+            "\t--wait <f>         Seconds to wait between frames (default: 0.05)\n"
+            "\t--density <f>         Ratio of space that should be filled with lines (default 0.5)\n"
             "\n",
             argv[0]
         );
