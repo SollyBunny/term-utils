@@ -215,56 +215,55 @@ static void redrawAll() {
 }
 
 static void handleResize() {
-    const TermSize* termSizeNew = termSizeUpdate();
-    if (termSizeNew == NULL)
-        return;
+    const TermSize termSizeOld = termSize;
+    {
+        const TermSize* termSizeNew = termSizeUpdate();
+        if (termSizeNew == NULL)
+            return;
+        termSize = *termSizeNew;
+    }
     // Handle line size changing
-    const size_t linesAllocedNew = (size_t)((float)termSizeNew->w * (float)termSizeNew->h * density * 1.5f);
-    lines = realloc(lines, sizeof(*lines) * linesAllocedNew);
+    const size_t linesAllocedOld = linesAlloced;
+    linesAlloced = (size_t)((float)termSize.w * (float)termSize.h * density * 1.5f);
+    lines = realloc(lines, sizeof(*lines) * linesAlloced);
     if (!lines)
         abort();
-    for (size_t i = linesAlloced; i < linesAllocedNew; ++i)
+    for (size_t i = linesAllocedOld; i < linesAlloced; ++i)
         lines[i] = (Line){}; // Clear new lines
-    lineGaps = realloc(lineGaps, sizeof(*lineGaps) * termSizeNew->w);
+    lineGaps = realloc(lineGaps, sizeof(*lineGaps) * termSize.w);
     // Destroy old cols
-    const size_t maxOldLineIndex = linesAlloced > linesAllocedNew ? linesAllocedNew : linesAlloced;
-    if (termSizeNew->w < termSize.w) {
-        for (size_t i = 0; i < maxOldLineIndex; ++i) {
+    const size_t maxPossibleLineIndex = linesAlloced > linesAllocedOld ? linesAllocedOld : linesAlloced;
+    if (termSize.w < termSizeOld.w) {
+        for (size_t i = 0; i < maxPossibleLineIndex; ++i) {
             Line* line = &lines[i];
-            if (line->active && line->x >= termSizeNew->w)
+            if (line->active && line->x >= termSize.w)
                 line->active = false;
         }
     }
     // Fill new cols
-    for (int x = termSize.w; x < termSizeNew->w; ++x) {
+    for (int x = termSizeOld.w; x < termSize.w; ++x) {
         lineGaps[x] = 0;
         fillCol(x);
     }
     // Destroy old rows
-    if (termSizeNew->h < termSize.h) {
-        for (size_t i = 0; i < maxOldLineIndex; ++i) {
+    if (termSize.h < termSizeOld.h) {
+        for (size_t i = 0; i < maxPossibleLineIndex; ++i) {
             Line* line = &lines[i];
             if (line->active && line->y > termSize.h + line->l)
                 line->active = false;
         }
     }
     // Fill new rows
-    if (termSizeNew->h > termSize.h) {
-        // Needs correct termSize
-        const TermSize termSizeOld = termSize;
-        termSize = *termSizeNew;
-        for (size_t i = 0; i < maxOldLineIndex; ++i) {
+    if (termSize.h > termSizeOld.h) {
+        for (size_t i = 0; i < maxPossibleLineIndex; ++i) {
             Line* line = &lines[i];
             if (line->active)
                 continue;
             if (line->y >= termSizeOld.h)
                 lineDrawWhole(line);
         }
-        termSize = termSizeOld;
     }
-    // Apply vars
-    linesAlloced = linesAllocedNew;
-    termSize = *termSizeNew;
+    // Flush
     fflush(stdout);
 }
 
