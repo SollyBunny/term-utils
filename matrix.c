@@ -1,16 +1,16 @@
-#include "shared.h"
-
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-static const float secondsPerFrame = 0.05;
-static const int lineLength = 15;
-static const float density = 0.5;
-// density = lineLength / (lineLength + lineGap)
-static const int lineGap = (lineLength / density) - lineLength;
+#include "argparse.h"
+#include "shared.h"
+
+static float density;
+static int lineLength;
+static int lineGap;
+static bool english;
 
 static const char* englishChars[] = {
     "a", "b", "c", "d", "e", "f", "g", "h",
@@ -67,8 +67,6 @@ static Line* lines = NULL;
 // How long it's been since the last in each col
 static int* lineGaps = NULL;
 
-static bool japanese = true;
-
 static unsigned char randomizeColorComponent(unsigned char c) {
     int delta = randGet(-15, 15);
     int result = c + delta;
@@ -88,10 +86,10 @@ static Color randomizeColor(Color color) {
 }
 
 static const char* randomChar(void) {
-    if (japanese)
-        return japaneseChars[randGet(0, sizeof(japaneseChars) / sizeof(*japaneseChars) - 1)];
-    else
+    if (english)
         return englishChars[randGet(0, sizeof(englishChars) / sizeof(*englishChars) - 1)];
+    else
+        return japaneseChars[randGet(0, sizeof(japaneseChars) / sizeof(*japaneseChars) - 1)];
 }
 
 // Step a line
@@ -253,6 +251,39 @@ static void handleSig(int sig) {
 }
 
 int main(int argc, char** argv) {
+    lineLength = 15;
+    density = 0.5;
+    float secondsPerFrame = 0.05;
+    bool isHelp;
+    ArgparseParam params[] = {
+        ARGPARSE_HELP(&isHelp),
+        ARGPARSE_FLAG(NULL, "--english", &english),
+        ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
+        ARGPARSE_FLOAT(NULL, "--wait", &secondsPerFrame, 0, 1),
+        ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
+        ARGPARSE_END
+    };
+
+    argparse(argc, argv, params);
+    if (isHelp) {
+        printf(
+            "Usage: %s ...\n"
+            "Show a fullscreen matrix style scrolling effect\n"
+            "\n"
+            "\t-h --help         Show this message\n"
+            "\t--english         Use english characters instead of japanese\n"
+            "\t--linelength <i>  How long on average each line should be (default: 15)\n"
+            "\t--wait <f>        Seconds to wait between frames (default: 0.05)\n"
+            "\t--density <f>     Ratio of space that should be filled with lines (default 0.5)\n"
+            "\n",
+            argv[0]
+        );
+        return 0;
+    }
+
+    // density = lineLength / (lineLength + lineGap)
+    lineGap = (lineLength / density) - lineLength;
+
     randInit();
     termInit(handleSig);
     // Predraw so we start not blank
@@ -271,7 +302,7 @@ int main(int argc, char** argv) {
             while (termReadNonblock() != ' ')
                 usleep((unsigned int)(1e6 * secondsPerFrame / 2));
         } else if (c == 'j') {
-            japanese = !japanese;
+            english = !english;
             redrawAll();
         }
         handleResize();
