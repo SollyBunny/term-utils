@@ -82,26 +82,25 @@ static char *deathMsgs[18] = {
 typedef struct {
 	unsigned char sx; // maximun size of img
 	unsigned char sy; // height of img
-	unsigned char s;  // length of d[]
-	unsigned char
-		d[]; // image data in format of number of blacks/number of whites
+	// number of blacks/number of whites
+	// 0 is newline
+	// 255 is end
+	unsigned char d[128];
 } Img;
 
 static const Img deathImg = {
-	.sx = 23, .sy = 4, .s = 77, .d = {1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 2, 2, 3,
-									  1, 3, 1, 2, 0, 3, 1, 1, 1, 1, 1, 1, 1,
-									  1, 3, 1, 1, 1, 2, 1, 2, 3, 1, 1, 1, 1,
-									  0, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3,
-									  1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 0, 3,
-									  1, 3, 1, 3, 3, 2, 2, 3, 1, 3, 1, 2}};
+	.sx = 23, .sy = 4, .d = {1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 2, 2, 3, 1,	3, 1,
+							 2, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1,	1, 2,
+							 1, 2, 3, 1, 1, 1, 1, 0, 0, 2, 1, 1, 1, 1,	1, 1,
+							 1, 1, 1, 3, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1,	1, 0,
+							 3, 1, 3, 1, 3, 3, 2, 2, 3, 1, 3, 1, 2, 255}};
 
 static const Img winImg = {
-	.sx = 23, .sy = 4, .s = 81, .d = {1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 1, 3, 1, 1,
-									  3, 1, 2, 1, 1, 0, 3, 1, 1, 1, 1, 1, 1, 1,
-									  1, 3, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 0,
-									  0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1,
-									  1, 1, 1, 2, 1, 2, 1, 1, 2, 0, 3, 1, 3, 1,
-									  3, 3, 2, 1, 2, 1, 3, 1, 1, 2, 1}};
+	.sx = 23, .sy = 4, .d = {1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 1, 3, 1, 1,	3, 1, 2,
+							 1, 1, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1,	1, 1, 1,
+							 1, 2, 1, 2, 1, 1, 2, 0, 0, 2, 1, 1, 1, 1,	1, 1, 1,
+							 1, 1, 3, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2,	0, 3, 1,
+							 3, 1, 3, 3, 2, 1, 2, 1, 3, 1, 1, 2, 1, 255}};
 
 // Draws images from Img struct
 static void drawImg(const Img *img) {
@@ -113,8 +112,11 @@ static void drawImg(const Img *img) {
 	unsigned char y = 0;
 	unsigned char state = 0; // Drawing black/white
 
-	for (unsigned char i = 0; i < img->s; ++i) {
+	for (unsigned char i = 0; i < sizeof(img->d) / sizeof(img->d[0]); ++i) {
 		unsigned char count = img->d[i];
+
+		if (count == 255)
+			break;
 
 		if (count == 0) {
 			if (x == 0) {
