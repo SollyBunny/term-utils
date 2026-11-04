@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -13,7 +14,8 @@
 #define SNAKELEN 30
 #define SPEED 60000
 #define FRUITVAL 5
-#define LOOP
+
+const bool loop = true;
 
 // size of the board (terminal)
 unsigned int sizex; // termwidth / 2
@@ -192,64 +194,73 @@ int main(void) {
 	int grace = 0; // stores the amount of grace frames had, when a deadly collision happens this will be iterated, if it goes over a threshold, youll die
 	unsigned int newsnake;
 	while (true) {
+        usleep(SPEED); // the frame happens almost instantly so delay a bit (this is very inconsistnet if the frame takes alot of time, but this is c, this runs almost instantly)
+    	if (termInterrupted)
+    	    goto quit;
+
+        t++; // iterate time
+
+	    bool collided = false;
 	    c = termRead();
 		mainloopkeys:
-			switch (c) {
-				case 'w':
-					if (dir == 's') goto mainloopkeydefault; // if tried to double back, ignore input
-					newsnake = snake[0] - sizex;
-					if (newsnake >= size) { // top/bottom bounds check
-						#ifdef LOOP
-							newsnake += size;
-						#else
-							goto mainloopgracecheck;
-						#endif
-					}
-					break;
-				case 's':
-					if (dir == 'w') goto mainloopkeydefault;
-					newsnake = snake[0] + sizex;
-					if (newsnake >= size) { // top/bottom bounds check
-						#ifdef LOOP
-							newsnake -= size;
-						#else
-							goto mainloopgracecheck;
-						#endif
-					}
-					break;
-				case 'a':
-					if (dir == 'd') goto mainloopkeydefault;
-					newsnake = snake[0] - 1;
-					if ((newsnake / sizex) != (snake[0] / sizex)) { // left rgiht bound detection
-						#ifdef LOOP
-							newsnake += sizex;
-						#else
-							goto mainloopgracecheck;
-						#endif
-					}
-					break;
-				case 'd':
-					if (dir == 'a') goto mainloopkeydefault;
-					newsnake = snake[0] + 1;
-					if ((newsnake / sizex) != (snake[0] / sizex)) { // left rgiht bound detection
-						#ifdef LOOP
-							newsnake -= sizex;
-						#else
-							goto mainloopgracecheck;
-						#endif
-					}
-					break;
-				default: mainloopkeydefault:
-					if (dir == 0)
-						goto mainloopcontinue;
-					c = dir;
-					goto mainloopkeys;
+			if (c == 'w' && dir != 's') {
+				newsnake = snake[0] - sizex;
+				if (newsnake >= size) { // top/bottom bounds check
+					if (loop)
+						newsnake += size;
+					else
+					    collided = true;
+				}
+			} else if (c == 's' && dir != 'w') {
+				newsnake = snake[0] + sizex;
+				if (newsnake >= size) { // top/bottom bounds check
+					if (loop)
+						newsnake -= size;
+					else
+					    collided = true;
+				}
+			} else if (c == 'a' && dir != 'd') {
+				newsnake = snake[0] - 1;
+				if ((newsnake / sizex) != (snake[0] / sizex)) { // left/right bound detection
+					if (loop)
+						newsnake += sizex;
+					else
+	                    collided = true;
+				}
+	        } else if (c == 'd' && dir != 'a') {
+				newsnake = snake[0] + 1;
+				if ((newsnake / sizex) != (snake[0] / sizex)) { // left/right bound detection
+					if (loop)
+						newsnake -= sizex;
+					else
+					    collided = true;
+				}
+			} else {
+				if (dir == 0)
+					continue;
+				c = dir;
+				goto mainloopkeys;
 			}
 
-		for (unsigned int i = 3; i < snakelen; ++i) { // check if there is collision with self (impossible to collide with first 3 peices of snake)
-			if (snake[i] == newsnake) {
-				goto mainloopgracecheck;
-			}
+		if (!collided) {
+    		for (unsigned int i = 3; i < snakelen; ++i) { // check if there is collision with self (impossible to collide with first 3 peices of snake)
+    			if (snake[i] == newsnake) {
+    			    // if changing dir would result in _instant_ death, dont change dir
+    			    if (dir != c) {
+    					c = dir;
+                        goto mainloopkeys;
+    			    } else {
+    					collided = true;
+                    }
+    				break;
+    			}
+    		}
+		}
+
+		if (collided) {
+		    grace += 1;
+			if (grace >= GRACE) goto dead;
+			continue;
 		}
 
 		dir = c;
@@ -292,13 +303,6 @@ int main(void) {
 		);
 
 		fflush(stdout); // since no \n are written, stdout must be flushed or "lag" will be seen
-
-		mainloopcontinue:
-		usleep(SPEED); // the frame happens almost instantly so delay a bit (this is very inconsistnet if the frame takes alot of time, but this is c, this runs almost instantly)
-		if (termInterrupted)
-		    goto quit;
-
-		t++; // iterate time
 	}
 	goto quit; // only reached if ctrl-c is pressed
 
@@ -338,11 +342,4 @@ int main(void) {
 		draw(&winimg);
 		fflush(stdout);
 		goto end;
-
-	mainloopgracecheck:
-		if (dir != c) goto mainloopkeydefault; // if changing dir would result in _instant_ death, dont change dir
-		if (grace == GRACE) goto dead;
-		grace++;
-		goto mainloopcontinue;
-
 }
