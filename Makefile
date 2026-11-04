@@ -1,8 +1,8 @@
 PREFIX ?= /usr/local/bin
 
 CFLAGS = -Wall -Wextra -Wpedantic
-# CFLAGS += -fsanitize=address -g -fno-omit-frame-pointer
-CFLAGS += -O3
+CFLAGS += -fsanitize=address -g -fno-omit-frame-pointer
+# CFLAGS += -O3
 
 build: matrix lolcat snake
 
