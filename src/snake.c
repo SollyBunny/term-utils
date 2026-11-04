@@ -105,40 +105,43 @@ static const Img winImg = {
 
 // Draws images from Img struct
 static void drawImg(const Img *img) {
-	// place the cursor in the middle minus half of the size of the image
+	// Place the cursor in the middle minus half the size of the image
 	printf("\x1b[48;5;1m\x1b[%d;%dH", (sizeY - img->sy) / 2,
 		   (sizeX - img->sx) - 1);
 
 	unsigned char x = 0;
 	unsigned char y = 0;
-	unsigned char state = 0; // drawing black/white
+	unsigned char state = 0; // Drawing black/white
+
 	for (unsigned char i = 0; i < img->s; ++i) {
-		if (img->d[i] == 0) {
-			if (x == 0) { // check if the starting black # is 0, if so start
-						  // drawing whites
+		unsigned char count = img->d[i];
+
+		if (count == 0) {
+			if (x == 0) {
+				// Leading zero: skip the first black run
 				state = 1;
 				x++;
-				i++;
-				goto drawEndCheck;
+				continue;
 			}
-			x = 0; // otherwise assume that the 0 means a new line
+
+			// Zero marks a new line
+			x = 0;
 			state = 0;
 			y++;
+
 			printf("\x1b[%d;%dH", (sizeY - img->sy) / 2 + y,
-				   sizeX - img->sx -
-					   1); // move cursor to start of line one down
+				   sizeX - img->sx - 1);
 			continue;
 		}
-	drawEndCheck:
 
-		if (state == 1) { // if drawing whites, just skip that many tiles
+		if (state == 1) {
+			// Skip white tiles
 			state = 0;
-			printf("\x1b[%uC", img->d[i] * 2);
-		} else { // otherwise contintually draw a tile (2 wide)
+			printf("\x1b[%uC", count * 2);
+		} else {
+			// Draw black tiles
 			state = 1;
-			for (unsigned int m = 0; m < img->d[i];
-				 ++m) { // could be replaced for a printf or memset/fputs to
-						// save iterators
+			for (unsigned int m = 0; m < count; ++m) {
 				putchar(' ');
 				putchar(' ');
 			}
@@ -148,14 +151,18 @@ static void drawImg(const Img *img) {
 	}
 }
 
-// Randomly place the fruit on the board where there's a free tile
 static void placeFruit() {
-placeFruitStart:
-	fruitPos = (Pos){randGet(0, sizeX - 1), randGet(0, sizeY - 1)};
-	// Check if collides with snake
-	for (unsigned int i = 0; i < snakeLen; ++i) {
-		if (posEqual(snake[i], fruitPos))
-			goto placeFruitStart;
+	while (true) {
+		fruitPos = (Pos){randGet(0, sizeX - 1), randGet(0, sizeY - 1)};
+		bool collided = false;
+		for (unsigned int i = 0; i < snakeLen; ++i) {
+			if (posEqual(snake[i], fruitPos)) {
+				collided = true;
+				break;
+			}
+		}
+		if (!collided)
+			return;
 	}
 }
 
@@ -183,16 +190,14 @@ static bool doCollisionWithSnakeAndBorder(Pos *ppos) {
 	return false;
 }
 
-int main(void) {
-	randInit();
-	termInit();
+static void destroy() {
+	termDestroy();
+	if (snake)
+		free(snake);
+	exit(0);
+}
 
-	const TermSize *termSize = termSizeUpdate();
-	sizeX = termSize->w / 2;
-	sizeY = termSize->h - 1;
-
-start:
-
+static bool play() {
 	// Create snake
 	snakeLen = initialSnakeLen;
 	snake = realloc(snake, snakeLen * sizeof(snake[0]));
@@ -205,6 +210,7 @@ start:
 	placeFruit();
 
 	// Draw first frame of board
+	printf("\x1b[0m\x1b[2J");
 	printf("\x1b[%d;%dH\x1b[48;5;33m  ", snake[0].y + 1,
 		   snake[0].x * 2 + 1); // draw snake head
 	printf("\x1b[%d;%dH\x1b[48;5;%um  ", fruitPos.y + 1, fruitPos.x * 2 + 1,
@@ -217,7 +223,7 @@ start:
 	while (true) {
 		usleep((long)(1e6 * delaySeconds));
 		if (termInterrupted)
-			goto quit;
+			destroy();
 
 		t++;
 
@@ -243,7 +249,7 @@ start:
 		if (collided) {
 			grace += 1;
 			if (grace >= graceFrames)
-				goto dead;
+				return false;
 			continue;
 		}
 
@@ -258,9 +264,8 @@ start:
 
 		// Fruit collision
 		if (posEqual(snakeNew, fruitPos)) {
-			if (snakeLen + fruitValue >= (size_t)(sizeX * sizeY)) {
-				goto win;
-			}
+			if (snakeLen + fruitValue >= (size_t)(sizeX * sizeY))
+				return true;
 
 			placeFruit();
 
@@ -294,40 +299,45 @@ start:
 		fflush(stdout); // since no \n are written, stdout must be flushed or
 						// "lag" will be seen
 	}
+}
 
-dead:
-	printf("\x1b[0m\x1b[%d;0HYou Died! Want to restart? (y/n)", sizeY + 1);
-	drawImg(&deathImg);
-	unsigned int i = randGet(0, sizeof(deathMsgs) / sizeof(deathMsgs[0]) - 1);
-	printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 3,
-		   sizeX - ((int)strlen(deathMsgs[i]) / 2), deathMsgs[i]);
-	fflush(stdout);
-	goto end;
+int main(void) {
+	randInit();
+	termInit();
 
-win:
-	printf("\x1b[0m\x1b[%d;0HYou Win! Want to restart? (y/n)", sizeY + 1);
-	drawImg(&winImg);
-	fflush(stdout);
-	goto end;
+	const TermSize *termSize = termSizeUpdate();
+	sizeX = termSize->w / 2;
+	sizeY = termSize->h - 1;
 
-end:
-	termReadSetBlocking(true);
-	char c;
-	do { // wait for valid input, if y reset, otherwise quit
-		c = termRead();
-		if (termInterrupted)
-			goto quit;
-	} while (c != 'y' && c != 'n');
-	termReadSetBlocking(false);
-	if (c == 'y') {
-		printf("\x1b[2J");
-		goto start;
+	while (true) {
+		const bool win = play();
+
+		if (win) {
+			printf("\x1b[0m\x1b[%d;0HYou Win! Want to restart? (y/n)",
+				   sizeY + 1);
+			drawImg(&winImg);
+		} else {
+			printf("\x1b[0m\x1b[%d;0HYou Died! Want to restart? (y/n)",
+				   sizeY + 1);
+			drawImg(&deathImg);
+			unsigned int i =
+				randGet(0, sizeof(deathMsgs) / sizeof(deathMsgs[0]) - 1);
+			printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 3,
+				   sizeX - ((int)strlen(deathMsgs[i]) / 2), deathMsgs[i]);
+		}
+		fflush(stdout);
+
+		char c;
+		termReadSetBlocking(true);
+		do { // wait for valid input, if y reset, otherwise quit
+			c = termRead();
+			if (termInterrupted)
+				destroy();
+		} while (c != 'y' && c != 'n');
+		termReadSetBlocking(false);
+		if (c == 'n')
+			break;
 	}
-	goto quit;
 
-// reset stuff & exit
-quit:
-	termDestroy();
-	free(snake);
-	return 0;
+	destroy();
 }
