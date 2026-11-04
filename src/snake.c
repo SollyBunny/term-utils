@@ -15,20 +15,51 @@
 #define SPEED 60000
 #define FRUITVAL 5
 
-const bool loop = true;
+static const bool loop = true;
 
 // size of the board (terminal)
-unsigned int sizex; // termwidth / 2
-unsigned int sizey; // termheight - 1
-unsigned int size; // sizex * sizey
+static int sizex; // termwidth / 2
+static int sizey; // termheight - 1
+static int size; // sizex * sizey
 
-// position of fruit = y * sizex + x
-unsigned int fruitpos;
+typedef struct {
+    int x, y;
+} Pos;
 
-// a list of positions where the snake is
-// position = fruit = y * sizex + x
-unsigned int * snake;
-unsigned int snakelen;
+static inline bool posEqual(Pos a, Pos b) {
+    return a.x == b.x && a.y == b.y;
+}
+
+static inline Pos posAdd(Pos a, Pos b) {
+    return (Pos){ a.x + b.x, a.y + b.y };
+}
+
+static const Pos dirUp    = { 0, -1 };
+static const Pos dirDown  = { 0,  1 };
+static const Pos dirLeft  = {-1,  0 };
+static const Pos dirRight = { 1,  0 };
+static const Pos dirNone  = { 0,  0 };
+
+static Pos charToDir(char c) {
+    if (c == 'w' || c == 'W')
+        return dirUp;
+    if (c == 's' || c == 'S')
+        return dirDown;
+    if (c == 'a' || c == 'A')
+        return dirLeft;
+    if (c == 'd' || c == 'D')
+        return dirRight;
+    return dirNone;
+}
+
+static inline Pos posFlip(Pos dir) {
+    return (Pos){ -dir.x, -dir.y };
+}
+
+static Pos fruitpos;
+
+static Pos* snake;
+static size_t snakelen;
 
 // A pattern snake colors (255color)
 unsigned int snakecol[9] = {21, 20, 19, 18, 17, 18, 19, 20, 21};
@@ -148,11 +179,34 @@ unsigned int log10i(unsigned int a) {
 // Randomly place the fruit on the board where there's a free tile
 void placefruit() {
     placefruitstart:
-	fruitpos = randGet(0, size);
-	for (unsigned int i = 0; i < snakelen; ++i) { // checking if theres a collision
-		if (snake[i] == fruitpos)
-		    goto placefruitstart; // go back to the start, choose another location
+	fruitpos = (Pos){ randGet(0, sizex - 1), randGet(0, sizey - 1) };
+	// Check if collides with snake
+	for (unsigned int i = 0; i < snakelen; ++i) {
+		if (posEqual(snake[i], fruitpos))
+		    goto placefruitstart;
 	}
+}
+
+static bool doCollisionWithSnakeAndBorder(Pos* ppos) {
+    Pos pos = *ppos;
+    for (unsigned int i = 3; i < snakelen; ++i) { // check if there is collision with self (impossible to collide with first 3 peices of snake)
+        if (posEqual(snake[i], pos))
+			return true;
+    }
+
+	if (pos.x < 0 || pos.x >= sizex) {
+	    if (loop)
+			ppos->x = (pos.x % sizex + sizex) % sizex;
+	    else
+			return true;
+	} else if (pos.y < 0 || pos.y >= sizey) {
+	    if (loop)
+			ppos->y = (pos.y % sizey + sizey) % sizey;
+	    else
+			return true;
+	}
+
+	return false;
 }
 
 int main(void) {
@@ -173,26 +227,26 @@ int main(void) {
 
 	start:
 
-	placefruit();
-
 	// create snake
 	snakelen = SNAKELEN;
-	snake = malloc(snakelen * sizeof(unsigned int));
-	snake[0] = (size + sizex) / 2;
+	snake = realloc(snake, snakelen * sizeof(snake[0]));
+	snake[0] = (Pos){ sizex / 2, sizey / 2 };
 	for (unsigned int i = 1; i < snakelen - 1; ++i) { // set all snake positions to spawn point
 		snake[i] = snake[0];
 	}
 
+	// create fruit
+	placefruit();
+
 	// draw first frame of board
-	printf("\x1b[%u;%uH\x1b[48;5;33m  ", snake[0] / sizex + 1, snake[0] % sizex * 2 + 1); // draw snake head
-	printf("\x1b[%u;%uH\x1b[48;5;%um  ", fruitpos / sizex + 1, fruitpos % sizex * 2 + 1, fruitcol[0]); // draw fruit
+	printf("\x1b[%u;%uH\x1b[48;5;33m  ", snake[0].y + 1, snake[0].x * 2 + 1); // draw snake head
+	printf("\x1b[%u;%uH\x1b[48;5;%um  ", fruitpos.y + 1, fruitpos.x * 2 + 1, fruitcol[0]); // draw fruit
 	fflush(stdout);
 
 	// mainloop
-	char c;
-	char dir = 0; // the direction of the snake (stored by keycode of last key), used to make sure snake doesnt double back on itself
 	int grace = 0; // stores the amount of grace frames had, when a deadly collision happens this will be iterated, if it goes over a threshold, youll die
-	unsigned int newsnake;
+
+	Pos dir = dirNone; // delta x and y
 	while (true) {
         usleep(SPEED); // the frame happens almost instantly so delay a bit (this is very inconsistnet if the frame takes alot of time, but this is c, this runs almost instantly)
     	if (termInterrupted)
@@ -200,61 +254,22 @@ int main(void) {
 
         t++; // iterate time
 
-	    bool collided = false;
-	    c = termRead();
-		mainloopkeys:
-			if (c == 'w' && dir != 's') {
-				newsnake = snake[0] - sizex;
-				if (newsnake >= size) { // top/bottom bounds check
-					if (loop)
-						newsnake += size;
-					else
-					    collided = true;
-				}
-			} else if (c == 's' && dir != 'w') {
-				newsnake = snake[0] + sizex;
-				if (newsnake >= size) { // top/bottom bounds check
-					if (loop)
-						newsnake -= size;
-					else
-					    collided = true;
-				}
-			} else if (c == 'a' && dir != 'd') {
-				newsnake = snake[0] - 1;
-				if ((newsnake / sizex) != (snake[0] / sizex)) { // left/right bound detection
-					if (loop)
-						newsnake += sizex;
-					else
-	                    collided = true;
-				}
-	        } else if (c == 'd' && dir != 'a') {
-				newsnake = snake[0] + 1;
-				if ((newsnake / sizex) != (snake[0] / sizex)) { // left/right bound detection
-					if (loop)
-						newsnake -= sizex;
-					else
-					    collided = true;
-				}
-			} else {
-				if (dir == 0)
-					continue;
-				c = dir;
-				goto mainloopkeys;
-			}
+	    Pos newDir = charToDir(termRead());
+		// If invalid/no input or opposite input
+		if (posEqual(newDir, dirNone) || posEqual(newDir, posFlip(dir))) {
+		    if (posEqual(dir, dirNone)) // Can't do anything with no input;
+				continue;
+			newDir = dir;
+		}
 
-		if (!collided) {
-    		for (unsigned int i = 3; i < snakelen; ++i) { // check if there is collision with self (impossible to collide with first 3 peices of snake)
-    			if (snake[i] == newsnake) {
-    			    // if changing dir would result in _instant_ death, dont change dir
-    			    if (dir != c) {
-    					c = dir;
-                        goto mainloopkeys;
-    			    } else {
-    					collided = true;
-                    }
-    				break;
-    			}
-    		}
+        bool collided = false;
+		Pos newsnake = posAdd(snake[0], newDir);
+
+		if (doCollisionWithSnakeAndBorder(&newsnake)) {
+		    // If collision was result of direction change, undo it and try again
+			newDir = dir;
+			newsnake = posAdd(snake[0], newDir);
+			collided = doCollisionWithSnakeAndBorder(&newsnake);
 		}
 
 		if (collided) {
@@ -263,9 +278,9 @@ int main(void) {
 			continue;
 		}
 
-		dir = c;
+		dir = newDir;
 
-		printf("\x1b[%u;%uH\x1b[48;5;0m  ",  snake[snakelen - 1] / sizex + 1, snake[snakelen - 1] % sizex * 2 + 1); // remove old snake
+		printf("\x1b[%u;%uH\x1b[48;5;0m  ",  snake[snakelen - 1].y + 1, snake[snakelen - 1].x * 2 + 1); // remove old snake
 
 		// move all snake peices along by one
 		for (unsigned int i = snakelen - 1; i > 0; --i) {
@@ -275,60 +290,42 @@ int main(void) {
 		grace = 0; // set grace to 0 because the snake moved, so assuming it hasn't collided with anything
 
 		// fruit collision
-		if (newsnake == fruitpos) {
-			snakelen += FRUITVAL;
-			if (snakelen >= size) // if snakelen == size then that means the whole board is filled with snake, so you win
-				goto win;
+		if (posEqual(newsnake, fruitpos)) {
+    		if (snakelen + FRUITVAL >= (size_t)size) {
+    			goto win;
+            }
 
 			placefruit();
-			snake = realloc(snake, snakelen * sizeof(unsigned int)); // make snaek bigger
+
+			snakelen += FRUITVAL;
+			snake = realloc(snake, snakelen * sizeof(snake[0])); // make snaek bigger
 			for (unsigned int i = snakelen - FRUITVAL; i < snakelen; ++i) {
 				snake[i] = newsnake; // set new snake bits to extend snaek (shoudnt effect colours, due to the head being different color)
 			}
 		}
 
-		printf("\x1b[%u;%uH\x1b[48;5;33m  ", snake[0] / sizex + 1, snake[0] % sizex * 2 + 1); // draw snaek head
+		printf("\x1b[%u;%uH\x1b[48;5;33m  ", snake[0].y + 1, snake[0].x * 2 + 1); // draw snaek head
 		for (unsigned int i = 1; i < snakelen; ++i) { // draw snake body
-			printf("\x1b[%u;%uH\x1b[48;5;%um  ", snake[i] / sizex + 1, snake[i] % sizex * 2 + 1, snakecol[(i + (t / 2)) % (sizeof(snakecol) / sizeof(snakecol[0]))]);
+			printf("\x1b[%u;%uH\x1b[48;5;%um  ", snake[i].y + 1, snake[i].x * 2 + 1, snakecol[(i + (t / 2)) % (sizeof(snakecol) / sizeof(snakecol[0]))]);
 		}
-		printf("\x1b[%u;%uH\x1b[48;5;%um  ", fruitpos / sizex + 1, fruitpos % sizex * 2 + 1, fruitcol[t % (sizeof(fruitcol) / sizeof(fruitcol[0]))]); // draw fruit
+		printf("\x1b[%u;%uH\x1b[48;5;%um  ", fruitpos.y + 1, fruitpos.x * 2 + 1, fruitcol[t % (sizeof(fruitcol) / sizeof(fruitcol[0]))]); // draw fruit
 
 		// update info
-		printf("\x1b[0m\x1b[%d;0H\x1b[0mPOS %0*u,%0*u%*s%0*u SCORE",
+		printf("\x1b[0m\x1b[%d;0H\x1b[0mPOS %0*d,%0*d%*s%0*u SCORE",
 			sizey * 2,
-			sizess, snake[0] % sizex,
-			sizess, snake[0] / sizex + 1,
-			(sizex * 2) - (4 + sizess + 1 + sizess + 7 + sizes), "", // i realy hope compiler optimizes this
-			sizes, snakelen
+			sizess, snake[0].x,
+			sizess, snake[0].y,
+			(sizex * 2) - (4 + sizess + 1 + sizess + 7 + sizes), " ",
+			sizes, (int)snakelen
 		);
 
 		fflush(stdout); // since no \n are written, stdout must be flushed or "lag" will be seen
 	}
-	goto quit; // only reached if ctrl-c is pressed
-
-	end:
-	    termReadSetBlocking(true);
-		do { // wait for valid input, if y reset, otherwise quit
-		    c = termRead();
-			if (termInterrupted)
-			    goto quit;
-		} while (c != 'y' && c != 'n');
-		termReadSetBlocking(false);
-		if (c == 'y') {
-		    printf("\x1b[2J");
-			goto start;
-		}
-
-		// reset stuff & exit
-		quit:
-			termDestroy();
-			free(snake);
-			return 0;
 
 	dead:
 		printf("\x1b[0m\x1b[%d;0HYou Died! Want to restart? (y/n)", sizey * 2);
 		draw(&deathimg);
-		unsigned int i = randGet(0, sizeof(deathmsg) / sizeof(deathmsg[0]));
+		unsigned int i = randGet(0, sizeof(deathmsg) / sizeof(deathmsg[0]) - 1);
 		printf("\x1b[0m\x1b[%d;%dH%s",
 			sizey / 2 + 3,
 			sizex - ((int)strlen(deathmsg[i]) / 2),
@@ -342,4 +339,25 @@ int main(void) {
 		draw(&winimg);
 		fflush(stdout);
 		goto end;
+
+	end:
+	    termReadSetBlocking(true);
+		char c;
+		do { // wait for valid input, if y reset, otherwise quit
+		    c = termRead();
+			if (termInterrupted)
+			    goto quit;
+		} while (c != 'y' && c != 'n');
+		termReadSetBlocking(false);
+		if (c == 'y') {
+		    printf("\x1b[2J");
+			goto start;
+		}
+		goto quit;
+
+	// reset stuff & exit
+	quit:
+		termDestroy();
+		free(snake);
+		return 0;
 }
