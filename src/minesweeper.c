@@ -40,11 +40,11 @@ static bool isBomb(int x, int y) {
 }
 
 static void drawTile(int x, int y, bool cursor) {
-	const int i = y * sizeX + x;
+	const Tile *tile = &grid[y * sizeX + x];
 	printf("\x1b[%u;%uH", y + 1, x * 2 + 1);
 	printf("\x1b[0m");
 	printf("\x1b[1m");
-	switch (grid[i].state) {
+	switch (tile->state) {
 	case STATE_NONE:
 		if (cursor)
 			printf("\x1b[48;5;231m  ");
@@ -56,10 +56,10 @@ static void drawTile(int x, int y, bool cursor) {
 			printf("\x1b[48;5;231m");
 		else
 			printf("\x1b[0m");
-		if (grid[i].bomb == 0)
+		if (tile->bomb == 0)
 			printf("  ");
 		else
-			printf("\x1b[38;5;%um%u ", tileColors[grid[i].bomb], grid[i].bomb);
+			printf("\x1b[38;5;%um%u ", tileColors[tile->bomb], tile->bomb);
 		break;
 	case STATE_FLAG:
 		if (cursor)
@@ -80,14 +80,13 @@ static void recurseFind(int x, int y, bool cursor) {
 		return;
 	tile->state = STATE_UNCOVERED;
 	if (tile->bomb == 0) {
-		recurseFind(x - 1, y - 1, false);
-		recurseFind(x - 1, y, false);
-		recurseFind(x - 1, y + 1, false);
-		recurseFind(x, y - 1, false);
-		recurseFind(x, y + 1, false);
-		recurseFind(x + 1, y - 1, false);
-		recurseFind(x + 1, y, false);
-		recurseFind(x + 1, y + 1, false);
+		for (int dy = -1; dy <= 1; ++dy) {
+			for (int dx = -1; dx <= 1; ++dx) {
+				if (dx == 0 && dy == 0)
+					continue;
+				recurseFind(x + dx, y + dy, false);
+			}
+		}
 	}
 	drawTile(x, y, cursor);
 }
@@ -112,17 +111,16 @@ int main() {
 
 	for (int y = 0; y < sizeY; ++y) {
 		for (int x = 0; x < sizeX; ++x) {
-			const int i = y * sizeX + x;
-			if (grid[i].bomb == 9)
+			Tile *tile = &grid[y * sizeX + x];
+			if (tile->bomb == 9)
 				continue;
-			grid[i].bomb += isBomb(x - 1, y - 1);
-			grid[i].bomb += isBomb(x - 1, y);
-			grid[i].bomb += isBomb(x - 1, y + 1);
-			grid[i].bomb += isBomb(x, y - 1);
-			grid[i].bomb += isBomb(x, y + 1);
-			grid[i].bomb += isBomb(x + 1, y - 1);
-			grid[i].bomb += isBomb(x + 1, y);
-			grid[i].bomb += isBomb(x + 1, y + 1);
+			for (int dy = -1; dy <= 1; ++dy) {
+				for (int dx = -1; dx <= 1; ++dx) {
+					if (dx == 0 && dy == 0)
+						continue;
+					tile->bomb += isBomb(x + dx, y + dy);
+				}
+			}
 		}
 	}
 
