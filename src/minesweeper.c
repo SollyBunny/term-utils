@@ -198,7 +198,7 @@ int main() {
 					for (int dx = -1; dx <= 1; ++dx) {
 						if (dx == 0 && dy == 0)
 							continue;
-						uncoveredAround += isState(cursorX + dx, cursorY + dy, STATE_NONE);
+						uncoveredAround += !isState(cursorX + dx, cursorY + dy, STATE_UNCOVERED);
 					}
 				}
 				if (uncoveredAround == (int)tile->bomb) {
