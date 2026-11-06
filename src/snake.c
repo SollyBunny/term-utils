@@ -220,7 +220,7 @@ static bool play() {
 	fflush(stdout);
 
 	unsigned int t = 0;
-	int grace = 0;	   // Grace frames
+	int grace = 0;		// Grace frames
 	Pos dir = DIR_NONE; // dx and dy
 	while (true) {
 		usleep((long)(1e6 * delaySeconds));

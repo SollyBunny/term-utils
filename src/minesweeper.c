@@ -166,7 +166,8 @@ int main() {
 					for (int dx = -1; dx <= 1; ++dx) {
 						if (dx == 0 && dy == 0)
 							continue;
-						maxBombsAround -= isState(cursorX + dx, cursorY + dy, STATE_FLAG);
+						maxBombsAround -=
+							isState(cursorX + dx, cursorY + dy, STATE_FLAG);
 					}
 				}
 				if (maxBombsAround == 0) {
@@ -174,12 +175,15 @@ int main() {
 						for (int dx = -1; dx <= 1; ++dx) {
 							if (dx == 0 && dy == 0)
 								continue;
-							if (isState(cursorX + dx, cursorY + dy, STATE_NONE)) {
-								if (grid[(cursorY + dy) * sizeX + cursorX + dx].bomb == 9) {
+							if (isState(cursorX + dx, cursorY + dy,
+										STATE_NONE)) {
+								if (grid[(cursorY + dy) * sizeX + cursorX + dx]
+										.bomb == 9) {
 									dead = true;
 									destroy();
 								} else {
-									recurseFind(cursorX + dx, cursorY + dy, false);
+									recurseFind(cursorX + dx, cursorY + dy,
+												false);
 								}
 							}
 						}
@@ -198,7 +202,8 @@ int main() {
 					for (int dx = -1; dx <= 1; ++dx) {
 						if (dx == 0 && dy == 0)
 							continue;
-						uncoveredAround += !isState(cursorX + dx, cursorY + dy, STATE_UNCOVERED);
+						uncoveredAround += !isState(cursorX + dx, cursorY + dy,
+													STATE_UNCOVERED);
 					}
 				}
 				if (uncoveredAround == (int)tile->bomb) {
@@ -206,8 +211,10 @@ int main() {
 						for (int dx = -1; dx <= 1; ++dx) {
 							if (dx == 0 && dy == 0)
 								continue;
-							if (isState(cursorX + dx, cursorY + dy, STATE_NONE)) {
-								grid[(cursorY + dy) * sizeX + cursorX + dx].state = STATE_FLAG;
+							if (isState(cursorX + dx, cursorY + dy,
+										STATE_NONE)) {
+								grid[(cursorY + dy) * sizeX + cursorX + dx]
+									.state = STATE_FLAG;
 								drawTile(cursorX + dx, cursorY + dy, false);
 							}
 						}

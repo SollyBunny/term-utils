@@ -17,15 +17,15 @@ int termReadFancy(bool lower);
 void termReadSetBlocking(bool blocking);
 
 typedef struct {
-    int w;
-    int h;
+	int w;
+	int h;
 } TermSize;
 
 /**
  * Always returns first time
  * Copy this object before next call
  */
-TermSize* termSizeUpdate();
+TermSize *termSizeUpdate();
 
 // Waits for the terminal to be moved into the FG
 bool termWaitForUnpause();
