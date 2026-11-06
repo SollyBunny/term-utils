@@ -1,4 +1,3 @@
-#include <sched.h>
 #include <locale.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -8,6 +7,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <ctype.h>
 
 #include "term.h"
 
@@ -125,6 +125,23 @@ char termRead() {
     char c;
     ssize_t n = read(STDIN_FILENO, &c, 1);
     return n == 1 ? c : 0;
+}
+
+int termReadFancy(bool lower) {
+	char c = termRead();
+	if (c == '\x1b') {
+		c = termRead();
+		if (c == '[') {
+			c = termRead();
+			if (c == 'A') return TERM_CHAR_UP;
+			else if (c == 'B') return TERM_CHAR_DOWN;
+			else if (c == 'C') return TERM_CHAR_RIGHT;
+			else if (c == 'D') return TERM_CHAR_LEFT;
+		}
+	} else {
+		return lower ? tolower(c) : c;
+	}
+	return 0;
 }
 
 static TermSize termSize = {-1, -1};

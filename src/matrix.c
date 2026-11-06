@@ -355,7 +355,7 @@ int main(int argc, char **argv) {
 			redrawAll();
 			sleepStableReset();
 		}
-		const char c = termRead();
+		const char c = termReadFancy(true);
 		if (c == ' ') {
 			if (paused) {
 				paused = false;

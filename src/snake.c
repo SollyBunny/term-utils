@@ -27,22 +27,22 @@ static inline bool posEqual(Pos a, Pos b) { return a.x == b.x && a.y == b.y; }
 
 static inline Pos posAdd(Pos a, Pos b) { return (Pos){a.x + b.x, a.y + b.y}; }
 
-static const Pos dirUp = {0, -1};
-static const Pos dirDown = {0, 1};
-static const Pos dirLeft = {-1, 0};
-static const Pos dirRight = {1, 0};
-static const Pos dirNone = {0, 0};
+static const Pos DIR_UP = {0, -1};
+static const Pos DIR_DOWN = {0, 1};
+static const Pos DIR_LEFT = {-1, 0};
+static const Pos DIR_RIGHT = {1, 0};
+static const Pos DIR_NONE = {0, 0};
 
-static Pos charToDir(char c) {
-	if (c == 'w' || c == 'W')
-		return dirUp;
-	if (c == 's' || c == 'S')
-		return dirDown;
-	if (c == 'a' || c == 'A')
-		return dirLeft;
-	if (c == 'd' || c == 'D')
-		return dirRight;
-	return dirNone;
+static Pos charToDir(int c) {
+	if (c == 'w' || c == TERM_CHAR_UP)
+		return DIR_UP;
+	if (c == 's' || c == TERM_CHAR_DOWN)
+		return DIR_DOWN;
+	if (c == 'd' || c == TERM_CHAR_RIGHT)
+		return DIR_RIGHT;
+	if (c == 'a' || c == TERM_CHAR_LEFT)
+		return DIR_LEFT;
+	return DIR_NONE;
 }
 
 static inline Pos posFlip(Pos dir) { return (Pos){-dir.x, -dir.y}; }
@@ -221,7 +221,7 @@ static bool play() {
 
 	unsigned int t = 0;
 	int grace = 0;	   // Grace frames
-	Pos dir = dirNone; // dx and dy
+	Pos dir = DIR_NONE; // dx and dy
 	while (true) {
 		usleep((long)(1e6 * delaySeconds));
 		if (termInterrupted)
@@ -229,10 +229,10 @@ static bool play() {
 
 		t++;
 
-		Pos newDir = charToDir(termRead());
+		Pos newDir = charToDir(termReadFancy(true));
 		// If invalid/no input or opposite input
-		if (posEqual(newDir, dirNone) || posEqual(newDir, posFlip(dir))) {
-			if (posEqual(dir, dirNone)) // Can't do anything with no input;
+		if (posEqual(newDir, DIR_NONE) || posEqual(newDir, posFlip(dir))) {
+			if (posEqual(dir, DIR_NONE)) // Can't do anything with no input;
 				continue;
 			newDir = dir;
 		}

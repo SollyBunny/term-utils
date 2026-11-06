@@ -136,21 +136,21 @@ int main() {
 	drawTile(cursorX, cursorY, true);
 	while (true) {
 		// Read input
-		char c = termRead();
+		int c = termReadFancy(true);
 		if (termInterrupted)
 			break;
 
 		// Clear last cursor
 		drawTile(cursorX, cursorY, false);
 
-		if (c == 'w') {
+		if (c == 'w' || c == TERM_CHAR_UP) {
 			cursorY -= 1;
-		} else if (c == 's') {
+		} else if (c == 's' || c == TERM_CHAR_DOWN) {
 			cursorY += 1;
-		} else if (c == 'a') {
-			cursorX -= 1;
-		} else if (c == 'd') {
+		} else if (c == 'd' || c == TERM_CHAR_RIGHT) {
 			cursorX += 1;
+		} else if (c == 'a' || c == TERM_CHAR_LEFT) {
+			cursorX -= 1;
 		} else if (c == 'q') {
 			const Tile *tile = &grid[cursorY * sizeX + cursorX];
 			if (tile->state == STATE_NONE) {
