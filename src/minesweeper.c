@@ -4,7 +4,7 @@
 #include "lib/rand.h"
 #include "lib/term.h"
 
-static int sizeX, sizeY;
+static const unsigned int tileColors[] = {0, 21, 28, 124, 17, 52, 32, 255, 240};
 
 enum State {
 	STATE_NONE = 0,
@@ -18,25 +18,21 @@ typedef struct {
 	enum State state;
 } Tile;
 static Tile *grid;
-
-static const unsigned int tileColors[] = {
-	0,
-	21,	 // 1
-	28,	 // 2
-	124, // 3
-	17,	 // 4
-	52,	 // 5
-	32,	 // 6
-	255, // 7
-	240, // 8
-
-};
+static int sizeX, sizeY;
+static bool dead = false;
 
 static bool isBomb(int x, int y) {
 	if (x < 0 || x >= sizeX || y < 0 || y >= sizeY)
 		return false;
 	const Tile *tile = &grid[y * sizeX + x];
 	return tile->bomb == 9;
+}
+
+static bool isState(int x, int y, enum State state) {
+	if (x < 0 || x >= sizeX || y < 0 || y >= sizeY)
+		return false;
+	const Tile *tile = &grid[y * sizeX + x];
+	return tile->state == state;
 }
 
 static void drawTile(int x, int y, bool cursor) {
@@ -58,6 +54,8 @@ static void drawTile(int x, int y, bool cursor) {
 			printf("\x1b[0m");
 		if (tile->bomb == 0)
 			printf("  ");
+		else if (tile->bomb == 9)
+			printf("**");
 		else
 			printf("\x1b[38;5;%um%u ", tileColors[tile->bomb], tile->bomb);
 		break;
@@ -89,6 +87,13 @@ static void recurseFind(int x, int y, bool cursor) {
 		}
 	}
 	drawTile(x, y, cursor);
+}
+
+static void destroy() {
+	termDestroy();
+	if (dead)
+		printf("You died\n");
+	exit(0);
 }
 
 int main() {
@@ -126,7 +131,6 @@ int main() {
 
 	termReadSetBlocking(true);
 	bool firstLoop = true;
-	bool dead = false;
 	printf("\x1b[48;5;237m"); // BG Gray
 	printf("\x1b[2J\x1b[H");  // Clear screen
 	printf("\x1b[0m");		  // Reset
@@ -155,18 +159,64 @@ int main() {
 			if (tile->state == STATE_NONE) {
 				if (tile->bomb == 9) {
 					dead = true;
-					break;
+					destroy();
 				} else {
 					recurseFind(cursorX, cursorY, true);
-					fflush(stdout);
+				}
+			} else if (tile->state == STATE_UNCOVERED && tile->bomb > 0) {
+				int maxBombsAround = tile->bomb;
+				for (int dy = -1; dy <= 1; ++dy) {
+					for (int dx = -1; dx <= 1; ++dx) {
+						if (dx == 0 && dy == 0)
+							continue;
+						maxBombsAround -= isState(cursorX + dx, cursorY + dy, STATE_FLAG);
+					}
+				}
+				if (maxBombsAround == 0) {
+					for (int dy = -1; dy <= 1; ++dy) {
+						for (int dx = -1; dx <= 1; ++dx) {
+							if (dx == 0 && dy == 0)
+								continue;
+							if (isState(cursorX + dx, cursorY + dy, STATE_NONE)) {
+								if (grid[(cursorY + dy) * sizeX + cursorX + dx].bomb == 9) {
+									dead = true;
+									destroy();
+								} else {
+									recurseFind(cursorX + dx, cursorY + dy, false);
+								}
+							}
+						}
+					}
 				}
 			}
 		} else if (c == 'e') {
 			Tile *tile = &grid[cursorY * sizeX + cursorX];
-			if (tile->state == STATE_FLAG)
+			if (tile->state == STATE_FLAG) {
 				tile->state = STATE_NONE;
-			else if (tile->state == STATE_NONE)
+			} else if (tile->state == STATE_NONE) {
 				tile->state = STATE_FLAG;
+			} else if (tile->state == STATE_UNCOVERED && tile->bomb > 0) {
+				int uncoveredAround = 0;
+				for (int dy = -1; dy <= 1; ++dy) {
+					for (int dx = -1; dx <= 1; ++dx) {
+						if (dx == 0 && dy == 0)
+							continue;
+						uncoveredAround += isState(cursorX + dx, cursorY + dy, STATE_NONE);
+					}
+				}
+				if (uncoveredAround == (int)tile->bomb) {
+					for (int dy = -1; dy <= 1; ++dy) {
+						for (int dx = -1; dx <= 1; ++dx) {
+							if (dx == 0 && dy == 0)
+								continue;
+							if (isState(cursorX + dx, cursorY + dy, STATE_NONE)) {
+								grid[(cursorY + dy) * sizeX + cursorX + dx].state = STATE_FLAG;
+								drawTile(cursorX + dx, cursorY + dy, false);
+							}
+						}
+					}
+				}
+			}
 		}
 		cursorX = ((cursorX % sizeX) + sizeX) % sizeX;
 		cursorY = ((cursorY % sizeY) + sizeY) % sizeY;
@@ -175,8 +225,5 @@ int main() {
 		drawTile(cursorX, cursorY, true);
 	}
 
-	termDestroy();
-	if (dead)
-		printf("You died\n");
-	return 0;
+	destroy();
 }
