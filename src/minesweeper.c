@@ -89,6 +89,19 @@ static void recurseFind(int x, int y, bool cursor) {
 	drawTile(x, y, cursor);
 }
 
+static void redraw() {
+	printf("\x1b[48;5;237m"); // BG Gray
+	printf("\x1b[2J\x1b[H");  // Clear screen
+	printf("\x1b[0m");		  // Reset
+	for (int y = 0; y < sizeY; ++y) {
+		for (int x = 0; x < sizeX; ++x) {
+			if (!isState(x, y, STATE_NONE))
+				drawTile(x, y, false);
+		}
+	}
+
+}
+
 static void destroy() {
 	termDestroy();
 	if (dead)
@@ -139,6 +152,11 @@ int main() {
 		int c = termReadFancy(true);
 		if (termInterrupted)
 			break;
+
+		if (termWaitForUnpause()) {
+			termReadSetBlocking(true);
+			redraw();
+		}
 
 		// Clear last cursor
 		drawTile(cursorX, cursorY, false);

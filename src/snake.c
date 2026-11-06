@@ -227,6 +227,8 @@ static bool play() {
 		if (termInterrupted)
 			destroy();
 
+		termWaitForUnpause();
+
 		t++;
 
 		Pos newDir = charToDir(termReadFancy(true));
