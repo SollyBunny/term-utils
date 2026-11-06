@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "term.h"
@@ -27,6 +28,8 @@ static struct termios termiosOriginal = {};
 static struct termios termiosCurrent = {};
 static bool termInited = false;
 static char *termBuffer = NULL;
+
+static struct timespec sleepStableNext = {};
 
 static void handleSignal(int sig) {
 	switch (sig) {
@@ -83,13 +86,13 @@ void termInit() {
 	termiosCurrent.c_cc[VMIN] = 0;
 	termiosCurrent.c_cc[VTIME] = 0;
 	tcsetattr(STDIN_FILENO, TCSANOW, &termiosCurrent);
+
+	sleepStableReset();
 }
 
 void termDestroy() {
-	if (!termInited) {
-		fputs("Destroyed term twice\n", stderr);
+	if (!termInited)
 		return;
-	}
 	termInited = false;
 
 	setlocale(LC_ALL, "");
@@ -173,5 +176,28 @@ bool termWaitForUnpause() {
 	if (!termInited)
 		termInit();
 
+	sleepStableReset();
+
 	return true;
+}
+
+void sleepStableReset() {
+	clock_gettime(CLOCK_MONOTONIC, &sleepStableNext);
+}
+
+void sleepStable(float seconds) {
+	long ns = (long)(seconds * 1e9);
+
+	sleepStableNext.tv_sec += ns / 1000000000L;
+	sleepStableNext.tv_nsec += ns % 1000000000L;
+
+	if (sleepStableNext.tv_nsec >= 1000000000L) {
+		sleepStableNext.tv_sec++;
+		sleepStableNext.tv_nsec -= 1000000000L;
+	}
+
+	while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &sleepStableNext,
+						   NULL) != 0 &&
+		   !termInterrupted)
+		;
 }

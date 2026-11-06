@@ -1,10 +1,6 @@
 #include <math.h>
-#include <stdatomic.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
 
 #include "lib/argparse.h"
 #include "lib/rand.h"
@@ -245,31 +241,6 @@ static void destroy() {
 	free(lineGaps);
 }
 
-static struct timespec sleepStableNext = {};
-// Wait until at least [seconds] seconds to pass since the last [usleepStable]
-// call
-static void sleepStable(float seconds) {
-	if (sleepStableNext.tv_sec == 0 && sleepStableNext.tv_nsec == 0)
-		clock_gettime(CLOCK_MONOTONIC, &sleepStableNext);
-
-	long ns = (long)(seconds * 1e9);
-
-	sleepStableNext.tv_sec += ns / 1000000000L;
-	sleepStableNext.tv_nsec += ns % 1000000000L;
-
-	if (sleepStableNext.tv_nsec >= 1000000000L) {
-		sleepStableNext.tv_sec++;
-		sleepStableNext.tv_nsec -= 1000000000L;
-	}
-
-	while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &sleepStableNext,
-						   NULL) != 0 &&
-		   !termInterrupted)
-		;
-}
-
-static void sleepStableReset() { sleepStableNext = (struct timespec){}; }
-
 int main(int argc, char **argv) {
 	bool isHelp = false;
 	float frameDelay = 0.05;
@@ -351,10 +322,8 @@ int main(int argc, char **argv) {
 			sleepStable(frameDelay);
 		if (termInterrupted)
 			break;
-		if (termWaitForUnpause()) {
+		if (termWaitForUnpause())
 			redrawAll();
-			sleepStableReset();
-		}
 		const char c = termReadFancy(true);
 		if (c == ' ') {
 			if (paused) {

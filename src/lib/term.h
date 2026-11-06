@@ -29,3 +29,7 @@ TermSize *termSizeUpdate();
 
 // Waits for the terminal to be moved into the FG
 bool termWaitForUnpause();
+
+// Not in own files due to linkage with interruption and pausing
+void sleepStableReset();
+void sleepStable(float seconds);

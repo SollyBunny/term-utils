@@ -1,10 +1,6 @@
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <termios.h>
-#include <unistd.h>
 
 #include "lib/rand.h"
 #include "lib/term.h"
@@ -223,7 +219,7 @@ static bool play() {
 	int grace = 0;		// Grace frames
 	Pos dir = DIR_NONE; // dx and dy
 	while (true) {
-		usleep((long)(1e6 * delaySeconds));
+		sleepStable(delaySeconds);
 		if (termInterrupted)
 			destroy();
 
