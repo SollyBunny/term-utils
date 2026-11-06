@@ -130,11 +130,10 @@ int main() {
 	}
 
 	termReadSetBlocking(true);
-	bool firstLoop = true;
 	printf("\x1b[48;5;237m"); // BG Gray
 	printf("\x1b[2J\x1b[H");  // Clear screen
 	printf("\x1b[0m");		  // Reset
-	fflush(stdout);
+	drawTile(cursorX, cursorY, true);
 	while (true) {
 		// Read input
 		char c = termRead();
@@ -142,9 +141,7 @@ int main() {
 			break;
 
 		// Clear last cursor
-		if (!firstLoop)
-			drawTile(cursorX, cursorY, false);
-		firstLoop = false;
+		drawTile(cursorX, cursorY, false);
 
 		if (c == 'w') {
 			cursorY -= 1;
