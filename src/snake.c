@@ -4,6 +4,7 @@
 
 #include "lib/rand.h"
 #include "lib/term.h"
+#include "lib/text.h"
 
 static const int fruitValue = 5;
 static const int graceFrames = 3;
@@ -11,9 +12,8 @@ static const int initialSnakeLen = 30;
 static const float delaySeconds = 0.05;
 static const bool loop = true;
 
-// size of the board (terminal)
-static int sizeX; // termSize.x / 2
-static int sizeY; // termSize.y - 1
+static int sizeX;
+static int sizeY;
 
 typedef struct {
 	int x, y;
@@ -73,81 +73,6 @@ static char *deathMsgs[18] = {
 	"My deepest condolences",
 	"alt-f4",
 	"You almost beat your highscore"};
-
-// Encoded images for death/win toasts
-typedef struct {
-	unsigned char sx; // maximun size of img
-	unsigned char sy; // height of img
-	// number of blacks/number of whites
-	// 0 is newline
-	// 255 is end
-	unsigned char d[128];
-} Img;
-
-static const Img deathImg = {
-	.sx = 23, .sy = 4, .d = {1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 2, 2, 3, 1,	3, 1,
-							 2, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1,	1, 2,
-							 1, 2, 3, 1, 1, 1, 1, 0, 0, 2, 1, 1, 1, 1,	1, 1,
-							 1, 1, 1, 3, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1,	1, 0,
-							 3, 1, 3, 1, 3, 3, 2, 2, 3, 1, 3, 1, 2, 255}};
-
-static const Img winImg = {
-	.sx = 23, .sy = 4, .d = {1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 1, 3, 1, 1,	3, 1, 2,
-							 1, 1, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1,	1, 1, 1,
-							 1, 2, 1, 2, 1, 1, 2, 0, 0, 2, 1, 1, 1, 1,	1, 1, 1,
-							 1, 1, 3, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2,	0, 3, 1,
-							 3, 1, 3, 3, 2, 1, 2, 1, 3, 1, 1, 2, 1, 255}};
-
-// Draws images from Img struct
-static void drawImg(const Img *img) {
-	// Place the cursor in the middle minus half the size of the image
-	printf("\x1b[48;5;1m\x1b[%d;%dH", (sizeY - img->sy) / 2,
-		   (sizeX - img->sx) - 1);
-
-	unsigned char x = 0;
-	unsigned char y = 0;
-	unsigned char state = 0; // Drawing black/white
-
-	for (unsigned char i = 0; i < sizeof(img->d) / sizeof(img->d[0]); ++i) {
-		unsigned char count = img->d[i];
-
-		if (count == 255)
-			break;
-
-		if (count == 0) {
-			if (x == 0) {
-				// Leading zero: skip the first black run
-				state = 1;
-				x++;
-				continue;
-			}
-
-			// Zero marks a new line
-			x = 0;
-			state = 0;
-			y++;
-
-			printf("\x1b[%d;%dH", (sizeY - img->sy) / 2 + y,
-				   sizeX - img->sx - 1);
-			continue;
-		}
-
-		if (state == 1) {
-			// Skip white tiles
-			state = 0;
-			printf("\x1b[%uC", count * 2);
-		} else {
-			// Draw black tiles
-			state = 1;
-			for (unsigned int m = 0; m < count; ++m) {
-				putchar(' ');
-				putchar(' ');
-			}
-		}
-
-		x++;
-	}
-}
 
 static void placeFruit() {
 	while (true) {
@@ -315,15 +240,17 @@ int main(void) {
 		if (win) {
 			printf("\x1b[0m\x1b[%d;0HYou Win! Want to restart? (y/n)",
 				   sizeY + 1);
-			drawImg(&winImg);
+			printf("\x1b[42m");
+			drawText(termSize->w / 2, termSize->h / 2, "YOU WIN!", true);
 		} else {
 			printf("\x1b[0m\x1b[%d;0HYou Died! Want to restart? (y/n)",
 				   sizeY + 1);
-			drawImg(&deathImg);
-			unsigned int i =
-				randGet(0, sizeof(deathMsgs) / sizeof(deathMsgs[0]) - 1);
-			printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 3,
-				   sizeX - ((int)strlen(deathMsgs[i]) / 2), deathMsgs[i]);
+			printf("\x1b[41m");
+			drawText(termSize->w / 2, termSize->h / 2, "YOU DIED!", true);
+			const char *deathMsg = deathMsgs[randGet(
+				0, sizeof(deathMsgs) / sizeof(deathMsgs[0]) - 1)];
+			printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 4,
+				   sizeX - ((int)strlen(deathMsg) / 2), deathMsg);
 		}
 		fflush(stdout);
 
