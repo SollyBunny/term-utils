@@ -240,13 +240,19 @@ static bool play() {
 		if (termInterrupted)
 			destroy();
 
-		termWaitForUnpause();
+		if (termWaitForUnpause())
+			dir = DIR_NONE;
 
 		Pos newDir = charToDir(termReadFancy(true));
 		// If invalid/no input or opposite input
 		if (posEqual(newDir, DIR_NONE) || posEqual(newDir, posFlip(dir))) {
-			if (posEqual(dir, DIR_NONE)) // Can't do anything with no input;
+			// Can't do anything with no input
+			if (posEqual(dir, DIR_NONE)) {
+				printf("\x1b[0m\x1b[2J");
+				draw();
+				fflush(stdout);
 				continue;
+			}
 			newDir = dir;
 		}
 
