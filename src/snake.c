@@ -160,10 +160,10 @@ static void draw() {
 				b = clampedAddReflect(color.b, d);
 			} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
 				unsigned h = snakeLen / fruitValue;
-			    h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
-			    h ^= h >> 16;
-			    h *= 0x85ebca6bu;
-			    h ^= h >> 13;
+				h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
+				h ^= h >> 16;
+				h *= 0x85ebca6bu;
+				h ^= h >> 13;
 				r = clampedAddReflect(h % 255, d);
 				g = clampedAddReflect(h / 255 % 255, d);
 				b = clampedAddReflect(h / 255 / 255 % 255, d);
@@ -174,7 +174,9 @@ static void draw() {
 		}
 		case ARGPARSE_COLOR_MODE_RAINBOW:
 		case ARGPARSE_COLOR_MODE_MONOCHROME:
-			printf("\x1b[48;5;%dm  ", color.mode == ARGPARSE_COLOR_MODE_RAINBOW ? colorsRainbow(pos) : colorsMonochrome(pos));
+			printf("\x1b[48;5;%dm  ", color.mode == ARGPARSE_COLOR_MODE_RAINBOW
+										  ? colorsRainbow(pos)
+										  : colorsMonochrome(pos));
 			break;
 		case ARGPARSE_COLOR_MODE_BASIC:
 			printf("\x1b[10%cm  ", pos % 2 == 0 ? '2' : '3');
@@ -194,21 +196,23 @@ static void draw() {
 			b = color.b;
 		} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
 			unsigned h = snakeLen;
-		    h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
-		    h ^= h >> 16;
-		    h *= 0x85ebca6bu;
-		    h ^= h >> 13;
+			h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
+			h ^= h >> 16;
+			h *= 0x85ebca6bu;
+			h ^= h >> 13;
 			r = h % 255;
 			g = h / 255 % 255;
 			b = h / 255 / 255 % 255;
 		}
-		printf("\x1b[48;2;%u;%u;%um  ", (unsigned)r, (unsigned)g,
-			   (unsigned)b);
+		printf("\x1b[48;2;%u;%u;%um  ", (unsigned)r, (unsigned)g, (unsigned)b);
 		break;
 	}
 	case ARGPARSE_COLOR_MODE_RAINBOW:
 	case ARGPARSE_COLOR_MODE_MONOCHROME:
-		printf("\x1b[48;5;%dm  ", color.mode == ARGPARSE_COLOR_MODE_RAINBOW ? colorsRainbow(snakeLen / fruitValue) : colorsMonochrome(snakeLen / fruitValue));
+		printf("\x1b[48;5;%dm  ",
+			   color.mode == ARGPARSE_COLOR_MODE_RAINBOW
+				   ? colorsRainbow(snakeLen / fruitValue)
+				   : colorsMonochrome(snakeLen / fruitValue));
 		break;
 	case ARGPARSE_COLOR_MODE_BASIC:
 		printf("\x1b[101m  ");
