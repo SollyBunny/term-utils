@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #include "argparse.h"
 
@@ -44,9 +43,9 @@ static bool parseHexColor(const char *value, ArgparseColor *color) {
 		if (r < 0 || g < 0 || b < 0)
 			return false;
 
-		*color =
-			(ArgparseColor){(unsigned char)(r * 17), (unsigned char)(g * 17),
-							(unsigned char)(b * 17), ARGPARSE_COLOR_MODE_NORMAL};
+		*color = (ArgparseColor){
+			(unsigned char)(r * 17), (unsigned char)(g * 17),
+			(unsigned char)(b * 17), ARGPARSE_COLOR_MODE_NORMAL};
 		return true;
 	}
 
@@ -61,9 +60,9 @@ static bool parseHexColor(const char *value, ArgparseColor *color) {
 		if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0)
 			return false;
 
-		*color = (ArgparseColor){(unsigned char)(r1 * 16 + r2),
-								 (unsigned char)(g1 * 16 + g2),
-								 (unsigned char)(b1 * 16 + b2), ARGPARSE_COLOR_MODE_NORMAL};
+		*color = (ArgparseColor){
+			(unsigned char)(r1 * 16 + r2), (unsigned char)(g1 * 16 + g2),
+			(unsigned char)(b1 * 16 + b2), ARGPARSE_COLOR_MODE_NORMAL};
 		return true;
 	}
 
@@ -97,9 +96,9 @@ static bool parseDecimalColor(const char *value, ArgparseColor *color) {
 	if (*value != '\0')
 		return false;
 
-	*color = (ArgparseColor){(unsigned char)components[0],
-							 (unsigned char)components[1],
-							 (unsigned char)components[2], ARGPARSE_COLOR_MODE_NORMAL};
+	*color = (ArgparseColor){
+		(unsigned char)components[0], (unsigned char)components[1],
+		(unsigned char)components[2], ARGPARSE_COLOR_MODE_NORMAL};
 	return true;
 }
 
@@ -159,7 +158,7 @@ static bool parseColor(const char *value, ArgparseColor *color) {
 }
 
 void argparse(int argc, char *const *argv, const ArgparseParam *params,
-	bool *consumed) {
+			  bool *consumed) {
 	size_t paramCount = 0;
 	while (params[paramCount].type != ARGPARSE_TYPE_END)
 		++paramCount;

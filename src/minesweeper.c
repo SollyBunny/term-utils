@@ -99,7 +99,6 @@ static void redraw() {
 				drawTile(x, y, false);
 		}
 	}
-
 }
 
 static void destroy() {

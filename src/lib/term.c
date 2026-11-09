@@ -181,9 +181,7 @@ bool termWaitForUnpause() {
 	return true;
 }
 
-void sleepStableReset() {
-	clock_gettime(CLOCK_MONOTONIC, &sleepStableNext);
-}
+void sleepStableReset() { clock_gettime(CLOCK_MONOTONIC, &sleepStableNext); }
 
 void sleepStable(float seconds) {
 	long ns = (long)(seconds * 1e9);
