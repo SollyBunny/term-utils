@@ -22,8 +22,17 @@ typedef struct {
 	float max;
 } ArgparseParamFloat;
 
+enum ArgparseColorMode {
+	ARGPARSE_COLOR_MODE_NORMAL = 0,
+	ARGPARSE_COLOR_MODE_MONOCHROME,
+	ARGPARSE_COLOR_MODE_RAINBOW,
+	ARGPARSE_COLOR_MODE_RANDOM,
+	ARGPARSE_COLOR_MODE_BASIC,
+};
+
 typedef struct {
 	unsigned char r, g, b;
+	enum ArgparseColorMode mode;
 } ArgparseColor;
 
 typedef struct {
@@ -92,4 +101,4 @@ typedef struct {
 		(ArgparseParamUnion){.c = (ArgparseParamChoice){choices}}})
 
 void argparse(int argc, char *const *argv, const ArgparseParam *params,
-			  bool strict);
+			  bool *consumed);

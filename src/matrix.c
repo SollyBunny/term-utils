@@ -15,15 +15,7 @@ static bool english;
 static Color lineColor;
 static int colorVariation;
 
-enum ColorMode {
-	COLOR_MODE_NORMAL,
-	COLOR_MODE_RAINBOW,
-	COLOR_MODE_MONOCHROME,
-	COLOR_MODE_BASIC,
-};
-static enum ColorMode colorMode;
-
-static const char *englishChars[] = {
+static const char *ENGLISH_CHARS[] = {
 	"a", "b", "c",	"d", "e", "f", "g", "h", "i",  "j", "k", "l", "m", "n",
 	"o", "p", "q",	"r", "s", "t", "u", "v", "w",  "x", "y", "z", "A", "B",
 	"C", "D", "E",	"F", "G", "H", "I", "J", "K",  "L", "M", "N", "O", "P",
@@ -31,7 +23,7 @@ static const char *englishChars[] = {
 	"4", "5", "6",	"7", "8", "9", " ", "!", "\"", "#", "$", "%", "&", "'",
 	"(", ")", "*",	"+", ",", "-", ".", "/", ":",  ";", "<", "=", ">", "?",
 	"@", "[", "\\", "]", "^", "_", "`", "{", "|",  "}", "~"};
-static const char *japaneseChars[] = {
+static const char *JAPANESE_CHARS[] = {
 	"ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ", "サ", "シ",
 	"ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト", "ナ", "ニ", "ヌ", "ネ",
 	"ノ", "ハ", "ヒ", "フ", "ヘ", "ホ", "マ", "ミ", "ム", "メ", "モ", "ヤ",
@@ -44,7 +36,7 @@ static const char *japaneseChars[] = {
 typedef struct {
 	bool active; // Should this col be simulated
 	int x, y, l; // x, y pos of head and l length of tail
-	Color color; // Avg color of head
+	int nonce;
 } Line;
 
 static TermSize termSize = {};
@@ -65,23 +57,13 @@ static unsigned char randomizeColorComponent(unsigned char c) {
 	return (unsigned char)result;
 }
 
-static Color randomizeColor(Color color) {
-	if (colorMode == COLOR_MODE_MONOCHROME) {
-		const unsigned char v = randomizeColorComponent(color.r);
-		return (Color){v, v, v};
-	}
-	return (Color){randomizeColorComponent(color.r),
-				   randomizeColorComponent(color.g),
-				   randomizeColorComponent(color.b)};
-}
-
 static const char *randomChar(void) {
 	if (english)
-		return englishChars[randGet(
-			0, sizeof(englishChars) / sizeof(*englishChars) - 1)];
+		return ENGLISH_CHARS[randGet(
+			0, sizeof(ENGLISH_CHARS) / sizeof(*ENGLISH_CHARS) - 1)];
 	else
-		return japaneseChars[randGet(
-			0, sizeof(japaneseChars) / sizeof(*japaneseChars) - 1)];
+		return JAPANESE_CHARS[randGet(
+			0, sizeof(JAPANESE_CHARS) / sizeof(*JAPANESE_CHARS) - 1)];
 }
 
 // Step a line
@@ -91,21 +73,42 @@ static void lineSim(Line *line) {
 		line->active = false;
 }
 
-static void lineDrawDot(const Line *line, int x, int y) {
-	if (colorMode == COLOR_MODE_BASIC) {
-		int color = randGet(0, 1) > 0 ? randGet(32, 36) : randGet(92, 96);
-		printf("\x1b[%u;%uH"
-			   "\x1b[%dm"
-			   "%s",
-			   y + 1, x + 1, color, randomChar());
-	} else {
-		const Color color = randomizeColor(line->color);
-		printf("\x1b[%u;%uH"
-			   "\x1b[38;2;%u;%u;%um"
-			   "%s",
-			   y + 1, x + 1, (unsigned)color.r, (unsigned)color.g,
-			   (unsigned)color.b, randomChar());
+static void lineDrawDot(const Line *line, int y) {
+	printf("\x1b[%u;%uH", y + 1, line->x + 1);
+	switch (lineColor.mode) {
+	case ARGPARSE_COLOR_MODE_NORMAL: {
+		printf("\x1b[38;2;%u;%u;%um", randomizeColorComponent(lineColor.r),
+			   randomizeColorComponent(lineColor.g),
+			   randomizeColorComponent(lineColor.b));
+		break;
 	}
+	case ARGPARSE_COLOR_MODE_MONOCHROME: {
+		const unsigned int val = randomizeColorComponent(line->nonce % 255);
+		printf("\x1b[38;2;%u;%u;%um", val, val, val);
+		break;
+	}
+	case ARGPARSE_COLOR_MODE_RAINBOW: {
+		const float pos = (float)line->x / (float)termSize.w * M_PI * 2;
+		printf("\x1b[38;2;%u;%u;%um",
+			   randomizeColorComponent(sinf(pos) * 127 + 128),
+			   randomizeColorComponent(sinf(pos + 2 * M_PI / 3) * 127 + 128),
+			   randomizeColorComponent(sinf(pos + 4 * M_PI / 3) * 127 + 128));
+		break;
+	}
+	case ARGPARSE_COLOR_MODE_RANDOM: {
+		printf("\x1b[38;2;%u;%u;%um",
+			   randomizeColorComponent(line->nonce % 255),
+			   randomizeColorComponent(line->nonce / 255 % 255),
+			   randomizeColorComponent(line->nonce / 255 / 255 % 255));
+		break;
+	}
+	case ARGPARSE_COLOR_MODE_BASIC: {
+		const int color = randGet(0, 1) > 0 ? randGet(32, 36) : randGet(92, 96);
+		printf("\x1b[%dm", color);
+		break;
+	}
+	}
+	fputs(randomChar(), stdout);
 }
 
 // Draw the whole line
@@ -114,14 +117,14 @@ static void lineDrawWhole(const Line *line) {
 	const int yEnd = line->y >= line->l ? line->y - line->l : 0;
 
 	for (int y = yStart; y >= yEnd; --y)
-		lineDrawDot(line, line->x, y);
+		lineDrawDot(line, y);
 }
 
 // Draw just the head and clear the tail
 static void lineDraw(const Line *line) {
 	// Draw the character if inside the terminal.
 	if (line->y < termSize.h && line->x < termSize.w)
-		lineDrawDot(line, line->x, line->y);
+		lineDrawDot(line, line->y);
 
 	if (line->y >= line->l && line->y - line->l < termSize.h) {
 		printf("\x1b[%u;%uH"
@@ -139,22 +142,7 @@ static size_t lineNew(int x) {
 		return -1;
 	// Make new line
 	const int l = lineLength + randGet(0, 4);
-	Color color;
-	if (colorMode == COLOR_MODE_MONOCHROME) {
-		const unsigned char v = randGet(0, 255);
-		color = (Color){v, v, v};
-	} else if (colorMode == COLOR_MODE_RAINBOW) {
-		// const double pos = (double)randGet(0, 2048) / 2048 * M_PI * 2; //
-		// Actually random
-		const double pos = (double)x / (double)termSize.w * M_PI * 2 +
-						   ((double)(randGet(0, 64) - 32) / 128);
-		color = (Color){(int)(sin(pos) * 127 + 128),
-						(int)(sin(pos + 2 * M_PI / 3) * 127 + 128),
-						(int)(sin(pos + 4 * M_PI / 3) * 127 + 128)};
-	} else {
-		color = lineColor;
-	}
-	lines[i] = (Line){true, x, 0, l, color};
+	lines[i] = (Line){true, x, 0, l, randGet(0, 255 * 255 * 255)};
 	return i;
 }
 
@@ -248,35 +236,26 @@ int main(int argc, char **argv) {
 	float frameDelay = 0.05;
 	lineLength = 15;
 	density = 0.5;
-	bool isColorModeRainbow = false;
-	bool isColorModeMonochrome = false;
-	bool isColorModeBasic = false;
-	lineColor = (Color){100, 255, 100};
-	colorVariation = 20;
+	lineColor = (Color){100, 255, 100, ARGPARSE_COLOR_MODE_NORMAL};
+	colorVariation = 50;
 	english = false;
 	ArgparseParam params[] = {
 		ARGPARSE_HELP(&isHelp),
 		ARGPARSE_FLOAT("-d", "--delay", &frameDelay, 0, 1),
 		// ARGPARSE_INT(NULL, "--linelength", &lineLength, 2, 100),
 		// ARGPARSE_FLOAT(NULL, "--density", &density, 0.1, 0.9),
-		ARGPARSE_FLAG("-r", "--rainbow", &isColorModeRainbow),
-		ARGPARSE_FLAG("-m", "--monochrome", &isColorModeMonochrome),
-		ARGPARSE_FLAG("-b", "--basic", &isColorModeBasic),
 		ARGPARSE_COLOR("-c", "--color", &lineColor),
 		// ARGPARSE_INT(NULL, "--colorvariation", &colorVariation, 0, 255),
 		ARGPARSE_FLAG(NULL, "--english", &english), ARGPARSE_END};
 
-	argparse(argc, argv, params, true);
+	argparse(argc, argv, params, NULL);
 	if (isHelp) {
 		printf("Usage: %s ...\n"
 			   "Show a fullscreen matrix style scrolling effect\n"
 			   "\n"
 			   "\t-h --help             Show this message\n"
-			   "\t-r --rainbow          Use rainbow colors\n"
-			   "\t-m --monochrome       Use only black and white\n"
-			   "\t-b --basic            Only use the 16 basic colors\n"
-			   "\t-c --color <c>        Color of lines, e.g. #00ff00, green, "
-			   "or 255,0,0 (default #64ff64)\n"
+			   "\t-c --color <c>        RRGGBB, RGB, rrr;ggg;bbb\n"
+			   "\t                      monochrome, rainbow, random, basic\n"
 			   // "\t--colorvariation <i>  How much each color component can
 			   // vary (default 30)\n"
 			   // "\t--linelength <i>      How long on average each line should
@@ -292,19 +271,6 @@ int main(int argc, char **argv) {
 		return 0;
 	}
 
-	if (isColorModeRainbow + isColorModeMonochrome + isColorModeBasic > 1) {
-		fprintf(stderr, "Only one of -r, -m or -b can be specified\n");
-		return 1;
-	} else if (isColorModeRainbow) {
-		colorMode = COLOR_MODE_RAINBOW;
-	} else if (isColorModeMonochrome) {
-		colorMode = COLOR_MODE_MONOCHROME;
-	} else if (isColorModeBasic) {
-		colorMode = COLOR_MODE_BASIC;
-	} else {
-		colorMode = COLOR_MODE_NORMAL;
-	}
-
 	// density = lineLength / (lineLength + lineGap)
 	lineGap = ((float)lineLength / density) - lineLength;
 	if (lineGap < 1)
@@ -312,7 +278,6 @@ int main(int argc, char **argv) {
 
 	randInit();
 	termInit();
-	// Predraw so we start not blank
 	handleResize();
 	for (int x = 0; x < termSize.w; ++x)
 		fillCol(x);

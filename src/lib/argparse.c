@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "argparse.h"
 
@@ -45,7 +46,7 @@ static bool parseHexColor(const char *value, ArgparseColor *color) {
 
 		*color =
 			(ArgparseColor){(unsigned char)(r * 17), (unsigned char)(g * 17),
-							(unsigned char)(b * 17)};
+							(unsigned char)(b * 17), ARGPARSE_COLOR_MODE_NORMAL};
 		return true;
 	}
 
@@ -62,7 +63,7 @@ static bool parseHexColor(const char *value, ArgparseColor *color) {
 
 		*color = (ArgparseColor){(unsigned char)(r1 * 16 + r2),
 								 (unsigned char)(g1 * 16 + g2),
-								 (unsigned char)(b1 * 16 + b2)};
+								 (unsigned char)(b1 * 16 + b2), ARGPARSE_COLOR_MODE_NORMAL};
 		return true;
 	}
 
@@ -98,7 +99,7 @@ static bool parseDecimalColor(const char *value, ArgparseColor *color) {
 
 	*color = (ArgparseColor){(unsigned char)components[0],
 							 (unsigned char)components[1],
-							 (unsigned char)components[2]};
+							 (unsigned char)components[2], ARGPARSE_COLOR_MODE_NORMAL};
 	return true;
 }
 
@@ -106,11 +107,19 @@ static bool parseColorName(const char *value, ArgparseColor *color) {
 	static const struct {
 		const char *name;
 		ArgparseColor color;
-	} colors[] = {{"red", {255, 0, 0}},		 {"orange", {255, 165, 0}},
-				  {"yellow", {255, 255, 0}}, {"green", {0, 255, 0}},
-				  {"blue", {0, 0, 255}},	 {"purple", {128, 0, 128}},
-				  {"black", {0, 0, 0}},		 {"white", {255, 255, 255}},
-				  {"magenta", {255, 0, 255}}};
+	} colors[] = {{"red", {255, 0, 0, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"orange", {255, 165, 0, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"yellow", {255, 255, 0, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"green", {0, 255, 0, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"blue", {0, 0, 255, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"purple", {128, 0, 128, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"black", {0, 0, 0, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"white", {255, 255, 255, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"magenta", {255, 0, 255, ARGPARSE_COLOR_MODE_NORMAL}},
+				  {"rainbow", {0, 0, 0, ARGPARSE_COLOR_MODE_RAINBOW}},
+				  {"monochrome", {0, 0, 0, ARGPARSE_COLOR_MODE_MONOCHROME}},
+				  {"random", {0, 0, 0, ARGPARSE_COLOR_MODE_RANDOM}},
+				  {"basic", {0, 0, 0, ARGPARSE_COLOR_MODE_BASIC}}};
 
 	for (size_t i = 0; i < sizeof(colors) / sizeof(*colors); ++i) {
 		const char *a = value;
@@ -150,13 +159,13 @@ static bool parseColor(const char *value, ArgparseColor *color) {
 }
 
 void argparse(int argc, char *const *argv, const ArgparseParam *params,
-			  bool strict) {
+	bool *consumed) {
 	size_t paramCount = 0;
 	while (params[paramCount].type != ARGPARSE_TYPE_END)
 		++paramCount;
 
 	bool seen[paramCount ? paramCount : 1];
-	memset(seen, 0, sizeof(seen));
+	memset(seen, false, sizeof(seen));
 
 	bool error = false;
 
@@ -166,12 +175,15 @@ void argparse(int argc, char *const *argv, const ArgparseParam *params,
 		const ArgparseParam *param = findParam(params, arg);
 
 		if (!param) {
-			if (!strict)
+			if (consumed)
 				continue;
 			fprintf(stderr, "Unrecognised parameter: %s\n", arg);
 			error = true;
 			continue;
 		}
+
+		if (consumed)
+			consumed[i] = true;
 
 		size_t index = (size_t)(param - params);
 
@@ -200,6 +212,9 @@ void argparse(int argc, char *const *argv, const ArgparseParam *params,
 		}
 
 		const char *value = argv[++i];
+
+		if (consumed)
+			consumed[i] = true;
 
 		switch (param->type) {
 		case ARGPARSE_TYPE_STRING: {

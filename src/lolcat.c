@@ -5,15 +5,20 @@
 #include "lib/argparse.h"
 #include "lib/rand.h"
 
-enum ColorMode {
-	COLOR_MODE_NORMAL,
-	COLOR_MODE_BASIC,
-	COLOR_MODE_MONOCHROME,
-};
-static enum ColorMode colorMode;
-static bool colorRandom;
+typedef ArgparseColor Color;
+
+static Color color;
 static bool colorInvert;
 static bool drawBold;
+
+static unsigned char clampedAddReflect(unsigned char a, unsigned char b) {
+	const int res = (int)a + (int)b;
+	if (res < 0)
+		return -res;
+	if (res > 255)
+		return 255 - (res - 255);
+	return res;
+}
 
 static int colorsBasic(int i) {
 	static int colors[] = {196, 202, 208, 214, 220, 226, 190, 154, 118,
@@ -33,7 +38,6 @@ static int colorsMonochrome(int i) {
 static void printChunk(const char *s, size_t n) {
 	static int x = 0;
 	static int y = 0;
-	int pos;
 	for (size_t i = 0; i < n; ++i) {
 		const char c = s[i];
 		switch (c) {
@@ -53,26 +57,49 @@ static void printChunk(const char *s, size_t n) {
 			x = 0;
 			++y;
 			break;
-		default:
-			if (colorRandom)
-				pos = randGet(0, 2048);
-			else
-				pos = x + y;
-			if (colorMode == COLOR_MODE_NORMAL) {
-				const double freq = 0.1;
-				const int r = (int)(sin(freq * pos) * 127 + 128);
-				const int g = (int)(sin(freq * pos + 2 * M_PI / 3) * 127 + 128);
-				const int b = (int)(sin(freq * pos + 4 * M_PI / 3) * 127 + 128);
+		default: {
+			const int pos = x + y;
+			switch (color.mode) {
+			case ARGPARSE_COLOR_MODE_NORMAL:
+			case ARGPARSE_COLOR_MODE_RAINBOW:
+			case ARGPARSE_COLOR_MODE_RANDOM: {
+				const float freq = 0.1;
+				unsigned char r, g, b;
+				if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
+					r = clampedAddReflect(color.r,
+										  (sinf(pos * freq) * 127 + 128) / 3);
+					g = clampedAddReflect(
+						color.g,
+						(sinf(pos * freq + 2 * M_PI / 3) * 127 + 128) / 3);
+					b = clampedAddReflect(
+						color.b,
+						(sinf(pos * freq + 4 * M_PI / 3) * 127 + 128) / 3);
+				} else if (color.mode == ARGPARSE_COLOR_MODE_RAINBOW) {
+					r = sinf(pos * freq) * 127 + 128;
+					g = sinf(pos * freq + 2 * M_PI / 3) * 127 + 128;
+					b = sinf(pos * freq + 4 * M_PI / 3) * 127 + 128;
+				} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
+					r = randGet(0, 255);
+					g = randGet(0, 255);
+					b = randGet(0, 255);
+				}
 				printf("\x1b[%c8;2;%d;%d;%dm%c", colorInvert ? '4' : '3', r, g,
 					   b, c);
-			} else {
-				const int color = colorMode == COLOR_MODE_MONOCHROME
-									  ? colorsMonochrome(pos)
-									  : colorsBasic(pos);
-				printf("\x1b[%c8;5;%dm%c", colorInvert ? '4' : '3', color, c);
+				break;
+			}
+			case ARGPARSE_COLOR_MODE_MONOCHROME:
+			case ARGPARSE_COLOR_MODE_BASIC: {
+				printf("\x1b[%c8;5;%dm%c", colorInvert ? '4' : '3',
+					   color.mode == ARGPARSE_COLOR_MODE_MONOCHROME
+						   ? colorsMonochrome(pos)
+						   : colorsBasic(pos),
+					   c);
+				break;
+			}
 			}
 			++x;
 			break;
+		}
 		}
 	}
 }
@@ -107,34 +134,18 @@ static void doFile(const char *path) {
 
 int main(int argc, char **argv) {
 	bool isHelp = false;
-	bool isColorModeBasic = false;
-	bool isColorModeMonochrome = false;
-	colorRandom = false;
-	colorInvert = false;
+	color = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_RAINBOW};
 	drawBold = false;
 	ArgparseParam params[] = {
-		ARGPARSE_HELP(&isHelp),
-		ARGPARSE_FLAG("-b", "--basic", &isColorModeBasic),
-		ARGPARSE_FLAG("-m", "--monochrome", &isColorModeMonochrome),
-		ARGPARSE_FLAG("-r", "--random", &colorRandom),
+		ARGPARSE_HELP(&isHelp), ARGPARSE_COLOR("-c", "--color", &color),
 		ARGPARSE_FLAG("-i", "--invert", &colorInvert),
-		ARGPARSE_FLAG(NULL, "--bold", &drawBold),
-		ARGPARSE_END};
+		ARGPARSE_FLAG("-b", "--bold", &drawBold), ARGPARSE_END};
 
-	argparse(argc, argv, params, false);
+	bool consumed[argc];
+	memset(consumed, false, sizeof(consumed));
+	argparse(argc, argv, params, consumed);
 
-	if (isColorModeMonochrome + isColorModeBasic > 1) {
-		fprintf(stderr, "Only one of -m or -b can be specified\n");
-		return 1;
-	} else if (isColorModeMonochrome) {
-		colorMode = COLOR_MODE_MONOCHROME;
-	} else if (isColorModeBasic) {
-		colorMode = COLOR_MODE_BASIC;
-	} else {
-		colorMode = COLOR_MODE_NORMAL;
-	}
-
-	if (colorRandom)
+	if (color.mode == ARGPARSE_COLOR_MODE_RANDOM)
 		randInit();
 
 	if (drawBold)
@@ -147,11 +158,10 @@ int main(int argc, char **argv) {
 			"If no file is given or - is given, read stdin\n"
 			"\n"
 			"\t-h --help             Show this message\n"
-			"\t-b --basic            Use only basic 256 colors\n"
-			"\t-m --monochrome       Use only black and white\n"
-			"\t-r --random           Use colors in a random order\n"
+			"\t-c --color <c>        RRGGBB, RGB, rrr;ggg;bbb\n"
+			"\t                      monochrome, rainbow, random, basic\n"
 			"\t-i --invert           Invert fg and bg\n"
-			"\t--bold                Use bold\n"
+			"\t-b --bold             Use bold\n"
 			"\n";
 		printChunk(help, sizeof(help));
 		printReset();
@@ -160,20 +170,8 @@ int main(int argc, char **argv) {
 
 	bool hasArg = false;
 	for (int i = 1; i < argc; ++i) {
-		bool isParam = false;
-
-		for (ArgparseParam *param = params; param->type != ARGPARSE_TYPE_END;
-			 ++param) {
-			if ((param->shortName && strcmp(argv[i], param->shortName) == 0) ||
-				(param->longName && strcmp(argv[i], param->longName) == 0)) {
-				isParam = true;
-				break;
-			}
-		}
-
-		if (isParam)
+		if (consumed[i])
 			continue;
-
 		hasArg = true;
 		doFile(argv[i]);
 	}
