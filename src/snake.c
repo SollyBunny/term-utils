@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "lib/argparse.h"
+#include "lib/circ.h"
 #include "lib/rand.h"
 #include "lib/term.h"
 #include "lib/text.h"
@@ -51,8 +52,8 @@ static inline Pos posFlip(Pos dir) { return (Pos){-dir.x, -dir.y}; }
 
 static Pos fruitPos;
 
-static Pos *snake;
-static size_t snakeLen;
+// <Pos>
+static CircBuffer snake;
 
 static char *DEATH_MSGS[18] = {
 	"Try avoiding walls",
@@ -78,8 +79,8 @@ static void placeFruit() {
 	while (true) {
 		fruitPos = (Pos){randGet(0, sizeX - 1), randGet(0, sizeY - 1)};
 		bool collided = false;
-		for (unsigned i = 0; i < snakeLen; ++i) {
-			if (posEqual(snake[i], fruitPos)) {
+		for (unsigned i = 0; i < snake.len; ++i) {
+			if (posEqual(CIRC_INDEX(snake, Pos, i), fruitPos)) {
 				collided = true;
 				break;
 			}
@@ -93,8 +94,8 @@ static bool doCollisionWithSnakeAndBorder(Pos *ppos) {
 	const Pos pos = *ppos;
 	// Impossible to collide with first 3 parts
 	// Allow colliding into last part as it will move by the time we get there
-	for (unsigned i = 3; i < snakeLen - 1; ++i) {
-		if (posEqual(snake[i], pos))
+	for (size_t i = 3; i < snake.len - 1; ++i) {
+		if (posEqual(CIRC_INDEX(snake, Pos, i), pos))
 			return true;
 	}
 
@@ -115,8 +116,7 @@ static bool doCollisionWithSnakeAndBorder(Pos *ppos) {
 
 static void destroy() {
 	termDestroy();
-	if (snake)
-		free(snake);
+	circFree(&snake);
 	exit(0);
 }
 
@@ -146,8 +146,8 @@ static unsigned char clampedAddReflect(unsigned char a, int b) {
 
 static void draw() {
 	// Draw snake
-	for (int i = snakeLen - 1; i >= 0; --i) {
-		printf("\x1b[%d;%dH", snake[i].y + 1, snake[i].x * 2 + 1);
+	for (int i = snake.len - 1; i >= 0; --i) {
+		printf("\x1b[%d;%dH", CIRC_INDEX(snake, Pos, i).y + 1, CIRC_INDEX(snake, Pos, i).x * 2 + 1);
 		const int pos = i / fruitValue;
 		switch (color.mode) {
 		case ARGPARSE_COLOR_MODE_NORMAL:
@@ -159,7 +159,7 @@ static void draw() {
 				g = clampedAddReflect(color.g, d);
 				b = clampedAddReflect(color.b, d);
 			} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
-				unsigned h = snakeLen / fruitValue;
+				unsigned h = snake.len / fruitValue;
 				h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
 				h ^= h >> 16;
 				h *= 0x85ebca6bu;
@@ -195,7 +195,7 @@ static void draw() {
 			g = color.g;
 			b = color.b;
 		} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
-			unsigned h = snakeLen;
+			unsigned h = snake.len;
 			h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
 			h ^= h >> 16;
 			h *= 0x85ebca6bu;
@@ -211,8 +211,8 @@ static void draw() {
 	case ARGPARSE_COLOR_MODE_MONOCHROME:
 		printf("\x1b[48;5;%dm  ",
 			   color.mode == ARGPARSE_COLOR_MODE_RAINBOW
-				   ? colorsRainbow(snakeLen / fruitValue)
-				   : colorsMonochrome(snakeLen / fruitValue));
+				   ? colorsRainbow(snake.len / fruitValue)
+				   : colorsMonochrome(snake.len / fruitValue));
 		break;
 	case ARGPARSE_COLOR_MODE_BASIC:
 		printf("\x1b[101m  ");
@@ -222,12 +222,10 @@ static void draw() {
 
 static bool play() {
 	// Create snake
-	snakeLen = initialSnakeLen;
-	snake = realloc(snake, snakeLen * sizeof(snake[0]));
-	snake[0] = (Pos){sizeX / 2, sizeY / 2};
-	for (unsigned i = 1; i < snakeLen;
-		 ++i) // Set all snake positions to spawn point
-		snake[i] = snake[0];
+	snake = circCreate(initialSnakeLen, sizeof(Pos));
+	// Set all snake positions to spawn point
+	for (int i = 0; i < initialSnakeLen; ++i)
+		*((Pos *)circAdd(&snake)) = (Pos){sizeX / 2, sizeY / 2};
 
 	// Create fruit
 	placeFruit();
@@ -261,13 +259,13 @@ static bool play() {
 		}
 
 		bool collided = false;
-		Pos snakeNew = posAdd(snake[0], newDir);
+		Pos snakeNew = posAdd(CIRC_INDEX(snake, Pos, 0), newDir);
 
 		if (doCollisionWithSnakeAndBorder(&snakeNew)) {
 			// If collision was result of direction change, undo it and try
 			// again
 			newDir = dir;
-			snakeNew = posAdd(snake[0], newDir);
+			snakeNew = posAdd(CIRC_INDEX(snake, Pos, 0), newDir);
 			collided = doCollisionWithSnakeAndBorder(&snakeNew);
 		}
 
@@ -282,25 +280,22 @@ static bool play() {
 		grace = 0;
 
 		// Move all snake peices along by one
-		for (unsigned i = snakeLen - 1; i > 0; --i)
-			snake[i] = snake[i - 1];
-		snake[0] = snakeNew; // Insert new snake peice
+		circPop(&snake);
+		*((Pos *)circAdd(&snake)) = snakeNew;
 
 		// Fruit collision
 		if (posEqual(snakeNew, fruitPos)) {
-			if (snakeLen + fruitValue >= (size_t)(sizeX * sizeY))
+			if (snake.len + fruitValue >= (size_t)(sizeX * sizeY))
 				return true;
 
 			placeFruit();
 
 			// Add new snake bits
-			snakeLen += fruitValue;
-			snake = realloc(snake, snakeLen * sizeof(snake[0]));
-			for (unsigned i = snakeLen - fruitValue; i < snakeLen; ++i)
-				snake[i] = snakeNew;
+			for (size_t i = 0; i < (size_t)fruitValue; ++i)
+				*((Pos *)circAdd(&snake)) = snakeNew;
 		}
 
-		const int score = (int)((snakeLen - initialSnakeLen) / fruitValue);
+		const int score = ((int)snake.len - initialSnakeLen) / fruitValue;
 		char scoreStr[32] = "";
 		if (score > 0)
 			snprintf(scoreStr, sizeof(scoreStr), "%d", score);
