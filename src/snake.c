@@ -146,7 +146,7 @@ static unsigned char clampedAddReflect(unsigned char a, int b) {
 
 static void draw() {
 	// Draw snake
-	for (unsigned i = 0; i < snakeLen; ++i) {
+	for (int i = snakeLen - 1; i >= 0; --i) {
 		printf("\x1b[%d;%dH", snake[i].y + 1, snake[i].x * 2 + 1);
 		const int pos = i / fruitValue;
 		switch (color.mode) {
