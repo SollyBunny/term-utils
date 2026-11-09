@@ -51,12 +51,12 @@ static Pos *snake;
 static size_t snakeLen;
 
 // A pattern snake colors (255 color)
-static unsigned int snakeColors[9] = {21, 20, 19, 18, 17, 18, 19, 20, 21};
+static unsigned int SNAKE_COLORS[] = {21, 20, 19, 18, 17, 18, 19, 20, 21};
 
 // Occilating fruit color (255 color)
-static unsigned int fruitColors[5] = {196, 197, 198, 197, 196};
+static unsigned int FRUIT_COLORS[] = {196, 197, 198, 197, 196};
 
-static char *deathMsgs[18] = {
+static char *DEATH_MSGS[18] = {
 	"Try avoiding walls",
 	"Better luck next time",
 	"Death is inevitable",
@@ -127,12 +127,12 @@ static void draw() {
 	printf("\x1b[%d;%dH\x1b[48;5;33m  ", snake[0].y + 1, snake[0].x * 2 + 1);
 	for (unsigned int i = 1; i < snakeLen; ++i)
 		printf("\x1b[%d;%dH\x1b[48;5;%um  ", snake[i].y + 1, snake[i].x * 2 + 1,
-			   snakeColors[(i + (t / 2)) %
-						   (sizeof(snakeColors) / sizeof(snakeColors[0]))]);
+			   SNAKE_COLORS[(i + (t / 2)) %
+							(sizeof(SNAKE_COLORS) / sizeof(SNAKE_COLORS[0]))]);
 
 	// Draw fruit
 	printf("\x1b[%d;%dH\x1b[48;5;%um  ", fruitPos.y + 1, fruitPos.x * 2 + 1,
-		   fruitColors[t % (sizeof(fruitColors) / sizeof(fruitColors[0]))]);
+		   FRUIT_COLORS[t % (sizeof(FRUIT_COLORS) / sizeof(FRUIT_COLORS[0]))]);
 }
 
 static bool play() {
@@ -247,8 +247,8 @@ int main() {
 				   sizeY + 1);
 			printf("\x1b[41m");
 			drawText(termSize.w / 2, termSize.h / 2, "YOU DIED!", true);
-			const char *deathMsg = deathMsgs[randGet(
-				0, sizeof(deathMsgs) / sizeof(deathMsgs[0]) - 1)];
+			const char *deathMsg = DEATH_MSGS[randGet(
+				0, sizeof(DEATH_MSGS) / sizeof(DEATH_MSGS[0]) - 1)];
 			printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 4,
 				   sizeX - ((int)strlen(deathMsg) / 2), deathMsg);
 		}
