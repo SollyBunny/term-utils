@@ -11,7 +11,9 @@ static const int graceFrames = 3;
 static const int initialSnakeLen = 30;
 static const float delaySeconds = 0.05;
 static const bool loop = true;
+static unsigned int t = 0;
 
+static TermSize termSize;
 static int sizeX;
 static int sizeY;
 
@@ -120,6 +122,19 @@ static void destroy() {
 	exit(0);
 }
 
+static void draw() {
+	// Draw snake
+	printf("\x1b[%d;%dH\x1b[48;5;33m  ", snake[0].y + 1, snake[0].x * 2 + 1);
+	for (unsigned int i = 1; i < snakeLen; ++i)
+		printf("\x1b[%d;%dH\x1b[48;5;%um  ", snake[i].y + 1, snake[i].x * 2 + 1,
+			   snakeColors[(i + (t / 2)) %
+						   (sizeof(snakeColors) / sizeof(snakeColors[0]))]);
+
+	// Draw fruit
+	printf("\x1b[%d;%dH\x1b[48;5;%um  ", fruitPos.y + 1, fruitPos.x * 2 + 1,
+		   fruitColors[t % (sizeof(fruitColors) / sizeof(fruitColors[0]))]);
+}
+
 static bool play() {
 	// Create snake
 	snakeLen = initialSnakeLen;
@@ -134,13 +149,9 @@ static bool play() {
 
 	// Draw first frame of board
 	printf("\x1b[0m\x1b[2J");
-	printf("\x1b[%d;%dH\x1b[48;5;33m  ", snake[0].y + 1,
-		   snake[0].x * 2 + 1); // draw snake head
-	printf("\x1b[%d;%dH\x1b[48;5;%um  ", fruitPos.y + 1, fruitPos.x * 2 + 1,
-		   fruitColors[0]); // draw fruit
+	draw();
 	fflush(stdout);
 
-	unsigned int t = 0;
 	int grace = 0;		// Grace frames
 	Pos dir = DIR_NONE; // dx and dy
 	while (true) {
@@ -179,13 +190,12 @@ static bool play() {
 		}
 
 		dir = newDir;
+		grace = 0;
 
 		// Move all snake peices along by one
 		for (unsigned int i = snakeLen - 1; i > 0; --i)
 			snake[i] = snake[i - 1];
 		snake[0] = snakeNew; // Insert new snake peice
-		grace = 0; // Set grace to 0 because the snake moved, so assuming it
-				   // hasn't collided with anything
 
 		// Fruit collision
 		if (posEqual(snakeNew, fruitPos)) {
@@ -201,52 +211,42 @@ static bool play() {
 				snake[i] = snakeNew;
 		}
 
+		const int score = (int)((snakeLen - initialSnakeLen) / fruitValue);
+		char scoreStr[32] = "";
+		if (score > 0)
+			snprintf(scoreStr, sizeof(scoreStr), "%d", score);
+
 		printf("\x1b[0m\x1b[2J");
-
-		// Draw info
-		printf("\x1b[%d;0HPOS %04d %04d", sizeY + 1, snake[0].x, snake[0].y);
-		printf("\x1b[%d;%dH%05d SCORE", sizeY + 1,
-			   sizeX * 2 + 1 - (int)sizeof(" SCORE") - 5, (int)snakeLen);
-
-		// Draw snake
-		printf("\x1b[%d;%dH\x1b[48;5;33m  ", snake[0].y + 1,
-			   snake[0].x * 2 + 1);
-		for (unsigned int i = 1; i < snakeLen; ++i)
-			printf("\x1b[%d;%dH\x1b[48;5;%um  ", snake[i].y + 1,
-				   snake[i].x * 2 + 1,
-				   snakeColors[(i + (t / 2)) %
-							   (sizeof(snakeColors) / sizeof(snakeColors[0]))]);
-
-		// Draw fruit
-		printf("\x1b[%d;%dH\x1b[48;5;%um  ", fruitPos.y + 1, fruitPos.x * 2 + 1,
-			   fruitColors[t % (sizeof(fruitColors) / sizeof(fruitColors[0]))]);
-
-		fflush(stdout); // since no \n are written, stdout must be flushed or
-						// "lag" will be seen
+		printf("\x1b[48;5;244m");
+		drawText(termSize.w / 2, termSize.h / 2, scoreStr, true);
+		draw();
+		fflush(stdout);
 	}
 }
 
-int main(void) {
+int main() {
 	randInit();
 	termInit();
 
-	const TermSize *termSize = termSizeUpdate();
-	sizeX = termSize->w / 2;
-	sizeY = termSize->h - 1;
+	termSize = *termSizeUpdate();
+	sizeX = termSize.w / 2;
+	sizeY = termSize.h;
 
 	while (true) {
 		const bool win = play();
 
+		printf("\x1b[0m\x1b[2J");
+		draw();
 		if (win) {
 			printf("\x1b[0m\x1b[%d;0HYou Win! Want to restart? (y/n)",
 				   sizeY + 1);
 			printf("\x1b[42m");
-			drawText(termSize->w / 2, termSize->h / 2, "YOU WIN!", true);
+			drawText(termSize.w / 2, termSize.h / 2, "YOU WIN!", true);
 		} else {
 			printf("\x1b[0m\x1b[%d;0HYou Died! Want to restart? (y/n)",
 				   sizeY + 1);
 			printf("\x1b[41m");
-			drawText(termSize->w / 2, termSize->h / 2, "YOU DIED!", true);
+			drawText(termSize.w / 2, termSize.h / 2, "YOU DIED!", true);
 			const char *deathMsg = deathMsgs[randGet(
 				0, sizeof(deathMsgs) / sizeof(deathMsgs[0]) - 1)];
 			printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 4,
