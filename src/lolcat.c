@@ -5,10 +5,12 @@
 #include "lib/argparse.h"
 #include "lib/rand.h"
 
-#define COLOR_MODE_NORMAL -1
-#define COLOR_MODE_BASIC 0
-#define COLOR_MODE_MONOCHROME 1
-static int colorMode;
+enum ColorMode {
+	COLOR_MODE_NORMAL,
+	COLOR_MODE_BASIC,
+	COLOR_MODE_MONOCHROME,
+};
+static enum ColorMode colorMode;
 static bool colorRandom;
 static bool colorInvert;
 static bool drawBold;

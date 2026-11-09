@@ -15,11 +15,13 @@ static bool english;
 static Color lineColor;
 static int colorVariation;
 
-#define COLOR_MODE_NORMAL -1
-#define COLOR_MODE_RAINBOW 0
-#define COLOR_MODE_MONOCHROME 1
-#define COLOR_MODE_BASIC 2
-static int colorMode;
+enum ColorMode {
+	COLOR_MODE_NORMAL,
+	COLOR_MODE_RAINBOW,
+	COLOR_MODE_MONOCHROME,
+	COLOR_MODE_BASIC,
+};
+static enum ColorMode colorMode;
 
 static const char *englishChars[] = {
 	"a", "b", "c",	"d", "e", "f", "g", "h", "i",  "j", "k", "l", "m", "n",
