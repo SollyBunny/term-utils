@@ -11,8 +11,8 @@ static Color color;
 static bool colorInvert;
 static bool drawBold;
 
-static unsigned char clampedAddReflect(unsigned char a, unsigned char b) {
-	const int res = (int)a + (int)b;
+static unsigned char clampedAddReflect(unsigned char a, int b) {
+	const int res = (int)a + b;
 	if (res < 0)
 		return -res;
 	if (res > 255)
@@ -83,8 +83,8 @@ static void printChunk(const char *s, size_t n) {
 					g = randGet(0, 255);
 					b = randGet(0, 255);
 				}
-				printf("\x1b[%c8;2;%d;%d;%dm%c", colorInvert ? '4' : '3', r, g,
-					   b, c);
+				printf("\x1b[%c8;2;%u;%u;%um%c", colorInvert ? '4' : '3',
+					   (unsigned)r, (unsigned)g, (unsigned)b, c);
 				break;
 			}
 			case ARGPARSE_COLOR_MODE_MONOCHROME:

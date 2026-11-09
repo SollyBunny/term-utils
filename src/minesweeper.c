@@ -4,7 +4,7 @@
 #include "lib/rand.h"
 #include "lib/term.h"
 
-static const unsigned int tileColors[] = {0, 21, 28, 124, 17, 52, 32, 255, 240};
+static const unsigned TILE_COLORS[] = {0, 21, 28, 124, 17, 52, 32, 255, 240};
 
 enum State {
 	STATE_NONE = 0,
@@ -14,7 +14,7 @@ enum State {
 
 typedef struct {
 	// 9 == bomb, 0-8 == number of bombs next to this tile
-	unsigned int bomb;
+	unsigned bomb;
 	enum State state;
 } Tile;
 static Tile *grid;
@@ -57,7 +57,7 @@ static void drawTile(int x, int y, bool cursor) {
 		else if (tile->bomb == 9)
 			printf("**");
 		else
-			printf("\x1b[38;5;%um%u ", tileColors[tile->bomb], tile->bomb);
+			printf("\x1b[38;5;%um%u ", TILE_COLORS[tile->bomb], tile->bomb);
 		break;
 	case STATE_FLAG:
 		if (cursor)

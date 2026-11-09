@@ -83,7 +83,7 @@ static void lineDrawDot(const Line *line, int y) {
 		break;
 	}
 	case ARGPARSE_COLOR_MODE_MONOCHROME: {
-		const unsigned int val = randomizeColorComponent(line->nonce % 255);
+		const unsigned val = randomizeColorComponent(line->nonce % 255);
 		printf("\x1b[38;2;%u;%u;%um", val, val, val);
 		break;
 	}

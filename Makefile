@@ -13,10 +13,10 @@ lolcat: src/lolcat.c src/lib/rand.* src/lib/argparse.*
 	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
 
 snake: src/snake.c src/lib/term.* src/lib/rand.* src/lib/argparse.* src/lib/text.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
+	cc $(CFLAGS) $(filter %.c,$^) -o $@
 
 minesweeper: src/minesweeper.c src/lib/term.* src/lib/rand.* src/lib/argparse.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
+	cc $(CFLAGS) $(filter %.c,$^) -o $@
 
 install: build
 	install -Dm755 matrix $(PREFIX)/matrix

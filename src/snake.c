@@ -2,16 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/argparse.h"
 #include "lib/rand.h"
 #include "lib/term.h"
 #include "lib/text.h"
+
+typedef ArgparseColor Color;
+
+static Color color;
 
 static const int fruitValue = 5;
 static const int graceFrames = 3;
 static const int initialSnakeLen = 30;
 static const float delaySeconds = 0.05;
 static const bool loop = true;
-static unsigned int t = 0;
 
 static TermSize termSize;
 static int sizeX;
@@ -50,12 +54,6 @@ static Pos fruitPos;
 static Pos *snake;
 static size_t snakeLen;
 
-// A pattern snake colors (255 color)
-static unsigned int SNAKE_COLORS[] = {21, 20, 19, 18, 17, 18, 19, 20, 21};
-
-// Occilating fruit color (255 color)
-static unsigned int FRUIT_COLORS[] = {196, 197, 198, 197, 196};
-
 static char *DEATH_MSGS[18] = {
 	"Try avoiding walls",
 	"Better luck next time",
@@ -80,7 +78,7 @@ static void placeFruit() {
 	while (true) {
 		fruitPos = (Pos){randGet(0, sizeX - 1), randGet(0, sizeY - 1)};
 		bool collided = false;
-		for (unsigned int i = 0; i < snakeLen; ++i) {
+		for (unsigned i = 0; i < snakeLen; ++i) {
 			if (posEqual(snake[i], fruitPos)) {
 				collided = true;
 				break;
@@ -95,7 +93,7 @@ static bool doCollisionWithSnakeAndBorder(Pos *ppos) {
 	const Pos pos = *ppos;
 	// Impossible to collide with first 3 parts
 	// Allow colliding into last part as it will move by the time we get there
-	for (unsigned int i = 3; i < snakeLen - 1; ++i) {
+	for (unsigned i = 3; i < snakeLen - 1; ++i) {
 		if (posEqual(snake[i], pos))
 			return true;
 	}
@@ -122,17 +120,100 @@ static void destroy() {
 	exit(0);
 }
 
+static int colorsRainbow(int i) {
+	static int colors[] = {196, 202, 208, 214, 220, 226, 190, 154, 118,
+						   82,	46,	 48,  49,  50,	51,	 45,  39,  33,
+						   27,	21,	 57,  93,  129, 165, 201};
+	static int colorSize = sizeof(colors) / (sizeof(colors[0]));
+	return colors[i % colorSize];
+}
+
+static int colorsMonochrome(int i) {
+	const int b = 238;
+	const int w = 255;
+	i = i % ((w - b) * 2);
+	return b + (i <= (w - b) ? i : (w - b) * 2 - i);
+}
+
+static unsigned char clampedAddReflect(unsigned char a, int b) {
+	const int res = (int)a + b;
+	if (res < 0)
+		return -res;
+	if (res > 255)
+		return 255 - (res - 255);
+	return res;
+}
+
 static void draw() {
 	// Draw snake
-	printf("\x1b[%d;%dH\x1b[48;5;33m  ", snake[0].y + 1, snake[0].x * 2 + 1);
-	for (unsigned int i = 1; i < snakeLen; ++i)
-		printf("\x1b[%d;%dH\x1b[48;5;%um  ", snake[i].y + 1, snake[i].x * 2 + 1,
-			   SNAKE_COLORS[(i + (t / 2)) %
-							(sizeof(SNAKE_COLORS) / sizeof(SNAKE_COLORS[0]))]);
+	for (unsigned i = 0; i < snakeLen; ++i) {
+		printf("\x1b[%d;%dH", snake[i].y + 1, snake[i].x * 2 + 1);
+		const int pos = i / fruitValue;
+		switch (color.mode) {
+		case ARGPARSE_COLOR_MODE_NORMAL:
+		case ARGPARSE_COLOR_MODE_RANDOM: {
+			const int d = pos % 2 == 0 ? -20 : 20;
+			unsigned char r, g, b;
+			if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
+				r = clampedAddReflect(color.r, d);
+				g = clampedAddReflect(color.g, d);
+				b = clampedAddReflect(color.b, d);
+			} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
+				unsigned h = snakeLen / fruitValue;
+			    h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
+			    h ^= h >> 16;
+			    h *= 0x85ebca6bu;
+			    h ^= h >> 13;
+				r = clampedAddReflect(h % 255, d);
+				g = clampedAddReflect(h / 255 % 255, d);
+				b = clampedAddReflect(h / 255 / 255 % 255, d);
+			}
+			printf("\x1b[48;2;%u;%u;%um  ", (unsigned)r, (unsigned)g,
+				   (unsigned)b);
+			break;
+		}
+		case ARGPARSE_COLOR_MODE_RAINBOW:
+		case ARGPARSE_COLOR_MODE_MONOCHROME:
+			printf("\x1b[48;5;%dm  ", color.mode == ARGPARSE_COLOR_MODE_RAINBOW ? colorsRainbow(pos) : colorsMonochrome(pos));
+			break;
+		case ARGPARSE_COLOR_MODE_BASIC:
+			printf("\x1b[10%cm  ", pos % 2 == 0 ? '2' : '3');
+			break;
+		}
+	}
 
 	// Draw fruit
-	printf("\x1b[%d;%dH\x1b[48;5;%um  ", fruitPos.y + 1, fruitPos.x * 2 + 1,
-		   FRUIT_COLORS[t % (sizeof(FRUIT_COLORS) / sizeof(FRUIT_COLORS[0]))]);
+	printf("\x1b[%d;%dH", fruitPos.y + 1, fruitPos.x * 2 + 1);
+	switch (color.mode) {
+	case ARGPARSE_COLOR_MODE_NORMAL:
+	case ARGPARSE_COLOR_MODE_RANDOM: {
+		unsigned char r, g, b;
+		if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
+			r = color.r;
+			g = color.g;
+			b = color.b;
+		} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
+			unsigned h = snakeLen;
+		    h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
+		    h ^= h >> 16;
+		    h *= 0x85ebca6bu;
+		    h ^= h >> 13;
+			r = h % 255;
+			g = h / 255 % 255;
+			b = h / 255 / 255 % 255;
+		}
+		printf("\x1b[48;2;%u;%u;%um  ", (unsigned)r, (unsigned)g,
+			   (unsigned)b);
+		break;
+	}
+	case ARGPARSE_COLOR_MODE_RAINBOW:
+	case ARGPARSE_COLOR_MODE_MONOCHROME:
+		printf("\x1b[48;5;%dm  ", color.mode == ARGPARSE_COLOR_MODE_RAINBOW ? colorsRainbow(snakeLen / fruitValue) : colorsMonochrome(snakeLen / fruitValue));
+		break;
+	case ARGPARSE_COLOR_MODE_BASIC:
+		printf("\x1b[101m  ");
+		break;
+	}
 }
 
 static bool play() {
@@ -140,7 +221,7 @@ static bool play() {
 	snakeLen = initialSnakeLen;
 	snake = realloc(snake, snakeLen * sizeof(snake[0]));
 	snake[0] = (Pos){sizeX / 2, sizeY / 2};
-	for (unsigned int i = 1; i < snakeLen;
+	for (unsigned i = 1; i < snakeLen;
 		 ++i) // Set all snake positions to spawn point
 		snake[i] = snake[0];
 
@@ -160,8 +241,6 @@ static bool play() {
 			destroy();
 
 		termWaitForUnpause();
-
-		t++;
 
 		Pos newDir = charToDir(termReadFancy(true));
 		// If invalid/no input or opposite input
@@ -193,7 +272,7 @@ static bool play() {
 		grace = 0;
 
 		// Move all snake peices along by one
-		for (unsigned int i = snakeLen - 1; i > 0; --i)
+		for (unsigned i = snakeLen - 1; i > 0; --i)
 			snake[i] = snake[i - 1];
 		snake[0] = snakeNew; // Insert new snake peice
 
@@ -207,7 +286,7 @@ static bool play() {
 			// Add new snake bits
 			snakeLen += fruitValue;
 			snake = realloc(snake, snakeLen * sizeof(snake[0]));
-			for (unsigned int i = snakeLen - fruitValue; i < snakeLen; ++i)
+			for (unsigned i = snakeLen - fruitValue; i < snakeLen; ++i)
 				snake[i] = snakeNew;
 		}
 
@@ -224,7 +303,28 @@ static bool play() {
 	}
 }
 
-int main() {
+int main(int argc, char **argv) {
+	bool isHelp = false;
+	color = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
+
+	ArgparseParam params[] = {ARGPARSE_HELP(&isHelp),
+							  ARGPARSE_COLOR("-c", "--color", &color),
+							  ARGPARSE_END};
+
+	argparse(argc, argv, params, NULL);
+
+	if (isHelp) {
+		printf("Usage: %s ...\n"
+			   "Play snake in your terminal\n"
+			   "\n"
+			   "\t-h --help             Show this message\n"
+			   "\t-c --color <c>        RRGGBB, RGB, rrr;ggg;bbb\n"
+			   "\t                      monochrome, rainbow, random, basic\n"
+			   "\n",
+			   argv[0]);
+		return 0;
+	}
+
 	randInit();
 	termInit();
 
