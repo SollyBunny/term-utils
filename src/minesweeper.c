@@ -14,7 +14,7 @@ enum State {
 
 typedef struct {
 	// 9 == bomb, 0-8 == number of bombs next to this tile
-	unsigned bomb;
+	unsigned char bomb;
 	enum State state;
 } Tile;
 static Tile *grid;
