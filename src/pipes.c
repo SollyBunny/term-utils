@@ -16,7 +16,7 @@ static const char *PIPE_CHARS[][12] = {
 	// https://github.com/pipeseroni/pipes.sh#contents
 	[0] = {"┃", "┏", "┓", "┛", "━", "┓", "┗", "┃", "┛", "┗", "┏", "━"},
 	[1] = {"│", "╭", "╮", "╯", "─", "╮", "╰", "│", "╯", "╰", "╭", "─"},
-	[2] = {"│", "┌", "┐", "┘", "─", "┐", "└", "│", "┘", "└", "┌", "─"},
+	[2] = {"│", "┌", "┐", "┘", "─", "┐", "└", "│", "┘", "└", "┌", "─"}, // Viewable on tty
 	[3] = {"║", "╔", "╗", "╝", "═", "╗", "╚", "║", "╝", "╚", "╔", "═"},
 	[4] = {"|", "+", "+", "+", "-", "+", "+", "|", "+", "+", "+", "-"},
 	[5] = {"|", "/", "\\", "/", "-", "\\", "\\", "|", "/", "\\", "/", "-"},
@@ -128,7 +128,7 @@ static void handleResize() {
 int main(int argc, char **argv) {
 	bool isHelp = false;
 	float frameDelay = 0.05;
-	int pipeSet = 0;
+	int pipeSet = 2;
 	pipeColor = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
 	colorVariation = 50;
 	ArgparseParam params[] = {
