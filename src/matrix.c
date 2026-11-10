@@ -103,8 +103,7 @@ static void lineDrawDot(const Line *line, int y) {
 		break;
 	}
 	case ARGPARSE_COLOR_MODE_BASIC: {
-		const int color = randGet(0, 1) > 0 ? randGet(32, 36) : randGet(92, 96);
-		printf("\x1b[%dm", color);
+		printf("\x1b[3%cm", line->nonce % ('6' - '1' + 1) + '1');
 		break;
 	}
 	}
