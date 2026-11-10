@@ -14,8 +14,8 @@ All made in C to be fast
 These replace older implementations
 
 * [matrix](https://github.com/sollybunny/matrix-archive)
+* In progress: [pipes](https://github.com/sollybunny/pipes-archive)
 * [rainbow](https://github.com/sollybunny/rainbow-archive)
 * In progress: [snake](https://github.com/sollybunny/snake-archive)
 * In progress: [minesweeper](https://github.com/sollybunny/minesweeper-archive)
-* TODO: [pipes](https://github.com/sollybunny/pipes-archive)
 * TODO: [sudoku](https://github.com/sollybunny/sudoku-archive)

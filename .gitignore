@@ -4,6 +4,7 @@
 *.trace
 
 matrix
+pipes
 lolcat
 snake
 minesweeper
