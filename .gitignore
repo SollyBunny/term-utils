@@ -1,10 +1,6 @@
-*.o
 *.txt
 *.log
 *.trace
-
-matrix
-pipes
-lolcat
-snake
-minesweeper
+bin
+deps
+obj

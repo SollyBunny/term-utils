@@ -1,34 +1,80 @@
-PREFIX ?= /usr/local/bin
+.DEFAULT_GOAL := all
 
-CFLAGS = -Wall -Wextra -Wpedantic
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+
+CC ?= cc
+AR ?= ar
+ARFLAGS := rcs
+CFLAGS ?= -Wall -Wextra -Wpedantic -O3
 # CFLAGS += -fsanitize=address -g -fno-omit-frame-pointer
-CFLAGS += -O3
+CPPFLAGS ?=
+LDFLAGS ?=
+LDLIBS ?= -lm
 
-build: matrix pipes lolcat snake minesweeper
+SRC_DIR := src
+BIN_DIR := bin
+OBJ_DIR := obj
+DEPS_DIR := deps
 
-matrix: src/matrix.c src/lib/term.* src/lib/rand.* src/lib/argparse.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
+# Every C file under src, including subdirectories.
+SRCS := $(sort $(shell find $(SRC_DIR) -type f -name '*.c'))
 
-pipes: src/pipes.c src/lib/term.* src/lib/rand.* src/lib/argparse.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
+# Mirror the source tree under the object directory:
+#   src/matrix.c   -> obj/matrix.o
+#   src/lib/term.c -> obj/lib/term.o
+OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+DEPS := $(OBJS:.o=.d)
 
-lolcat: src/lolcat.c src/lib/rand.* src/lib/argparse.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@ -lm
+# Applications are the top-level C files: src/<name>.c
+APP_SRCS := $(sort $(wildcard $(SRC_DIR)/*.c))
+LIB_SRCS := $(filter-out $(APP_SRCS),$(SRCS))
+LIB_OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(LIB_SRCS))
 
-snake: src/snake.c src/lib/term.* src/lib/rand.* src/lib/argparse.* src/lib/text.* src/lib/circ.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@
+PROGRAMS := $(sort $(basename $(notdir $(APP_SRCS))))
+BINS := $(addprefix $(BIN_DIR)/,$(PROGRAMS))
 
-minesweeper: src/minesweeper.c src/lib/term.* src/lib/rand.* src/lib/argparse.*
-	cc $(CFLAGS) $(filter %.c,$^) -o $@
+# Every library object is put in a static library. The linker pulls in only
+# the members each application actually references.
+LIBRARY := $(OBJ_DIR)/libtermutils.a
 
-install: build
-	install -Dm755 matrix $(PREFIX)/matrix
-	install -Dm755 pipes $(PREFIX)/pipes
-	install -Dm755 lolcat $(PREFIX)/lolcat
-	install -Dm755 snake $(PREFIX)/snake
-	install -Dm755 minesweeper $(PREFIX)/minesweeper
+all: $(BINS) $(OBJS)
+
+build: all
+
+objs: $(OBJS)
+
+# Build each object file from its corresponding source file.
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(BIN_DIR) $(OBJ_DIR):
+	mkdir -p $@
+
+$(LIBRARY): $(LIB_OBJS) | $(OBJ_DIR)
+	rm -f $@
+	$(AR) $(ARFLAGS) $@ $^
+
+define PROGRAM_template
+$(BIN_DIR)/$(1): $(OBJ_DIR)/$(1).o $(LIBRARY) | $(BIN_DIR)
+	$$(CC) $$(CFLAGS) $$(LDFLAGS) $$^ $$(LDLIBS) -o $$@
+
+$(1): $(BIN_DIR)/$(1)
+endef
+
+$(foreach prog,$(PROGRAMS),$(eval $(call PROGRAM_template,$(prog))))
+
+-include $(DEPS)
+
+install: all
+	@for prog in $(PROGRAMS); do \
+		install -Dm755 $(BIN_DIR)/$$prog $(DESTDIR)$(BINDIR)/$$prog; \
+	done
 
 clean:
-	rm -f matrix pipes lolcat snake minesweeper
+	rm -rf $(BIN_DIR) $(OBJ_DIR) $(DEPS_DIR)
 
-.PHONY: build install clean
+.DELETE_ON_ERROR:
+
+.PHONY: all build objs install clean $(PROGRAMS)
