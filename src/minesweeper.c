@@ -185,7 +185,7 @@ int main() {
 
 			fflush(stdout);
 			continue;
-		} else {
+		} else if (wasTooSmall) {
 			wasTooSmall = false;
 			drawAll();
 		}
