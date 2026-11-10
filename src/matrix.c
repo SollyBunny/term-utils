@@ -169,14 +169,9 @@ static void redrawAll() {
 	fflush(stdout);
 }
 
-static void handleResize() {
+static void handleResize(const TermEvent *event) {
 	const TermSize termSizeOld = termSize;
-	{
-		const TermSize *termSizeNew = termSizeUpdate();
-		if (termSizeNew == NULL)
-			return;
-		termSize = *termSizeNew;
-	}
+	termSize = event->data.resized;
 	// Handle line size changing
 	const size_t linesAllocedOld = linesAlloced;
 	linesAlloced =
@@ -276,37 +271,39 @@ int main(int argc, char **argv) {
 		lineGap = 1;
 
 	randInit();
+
+	termSetSettings(
+		(TermSettings){.lower = true, .readBlocking = false, .readTime = 0});
 	termInit();
-	handleResize();
-	for (int x = 0; x < termSize.w; ++x)
-		fillCol(x);
-	fflush(stdout);
 
 	bool paused = false;
 	while (true) {
 		if (!paused)
 			sleepStable(frameDelay);
-		if (termInterrupted)
+
+		TermEvent event = termGetEvent();
+		if (event.type == TERM_EVENT_INTERUPT) {
 			break;
-		if (termWaitForUnpause())
+		} else if (event.type == TERM_EVENT_RESIZED) {
+			handleResize(&event);
+		} else if (event.type == TERM_EVENT_PAUSED) {
 			redrawAll();
-		const char c = termReadFancy(true);
-		if (c == ' ') {
-			if (paused) {
-				paused = false;
-				termReadSetBlocking(false);
+		} else if (event.type == TERM_EVENT_KEY) {
+			int key = event.data.key;
+			if (key == ' ') {
+				paused = !paused;
 				sleepStableReset();
-			} else {
-				paused = true;
-				termReadSetBlocking(true);
+				termSetSettings((TermSettings){
+					.lower = true, .readBlocking = paused, .readTime = 0});
+			} else if (key == 'j') {
+				english = !english;
+				redrawAll();
 			}
-		} else if (c == 'j') {
-			english = !english;
-			redrawAll();
 		}
-		handleResize();
+
 		if (paused)
 			continue;
+
 		for (int x = 0; x < termSize.w; ++x) {
 			if (lineGaps[x] > lineGap && randGet(0, 1) == 1) {
 				const size_t index = lineNew(x);

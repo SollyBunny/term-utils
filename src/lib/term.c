@@ -31,18 +31,21 @@ static char *termBuffer = NULL;
 
 static struct timespec sleepStableNext = {};
 
+static TermSettings termSettings;
+static TermSize termSize = {0, 0};
+
 static void handleSignal(int sig) {
 	switch (sig) {
 	case SIGWINCH:
-		termResized = true;
+		atomic_store(&termResized, true);
 		break;
 	case SIGINT:
 	case SIGTERM:
 	case SIGQUIT:
-		termInterrupted = true;
+		atomic_store(&termInterrupted, true);
 		break;
 	case SIGTSTP:
-		termPaused = true;
+		atomic_store(&termPaused, true);
 		break;
 	}
 }
@@ -50,7 +53,7 @@ static void handleSignal(int sig) {
 void termInit() {
 	if (termInited) {
 		fputs("Inited term twice\n", stderr);
-		return;
+		abort();
 	}
 	termInited = true;
 
@@ -59,12 +62,15 @@ void termInit() {
 	sa.sa_handler = handleSignal;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
-	sigaction(SIGWINCH, &sa, NULL);
-	sigaction(SIGINT, &sa, NULL);
-	sigaction(SIGTERM, &sa, NULL);
-	sigaction(SIGQUIT, &sa, NULL);
-	sigaction(SIGTSTP, &sa, NULL);
-	sigaction(SIGCONT, &sa, NULL);
+	if (sigaction(SIGINT, &sa, NULL) == -1 ||
+		sigaction(SIGTERM, &sa, NULL) == -1 ||
+		sigaction(SIGQUIT, &sa, NULL) == -1 ||
+		sigaction(SIGWINCH, &sa, NULL) == -1 ||
+		sigaction(SIGTSTP, &sa, NULL) == -1 ||
+		sigaction(SIGCONT, &sa, NULL) == -1) {
+		perror("sigaction");
+		abort();
+	}
 
 	// Setup big stdout buffer
 	termBuffer = malloc(1024 * 1024);
@@ -81,11 +87,15 @@ void termInit() {
 
 	tcgetattr(STDIN_FILENO, &termiosOriginal);
 	tcgetattr(STDIN_FILENO, &termiosCurrent);
+	// Give signals please
+	termiosCurrent.c_lflag |= ISIG;
 	// Immediate input, No echo
 	termiosCurrent.c_lflag &= ~(ICANON | ECHO);
-	termiosCurrent.c_cc[VMIN] = 0;
-	termiosCurrent.c_cc[VTIME] = 0;
+	termiosCurrent.c_cc[VMIN] = termSettings.readBlocking ? 1 : 0;
+	termiosCurrent.c_cc[VTIME] = (int)(termSettings.readTime * 10);
 	tcsetattr(STDIN_FILENO, TCSANOW, &termiosCurrent);
+
+	setlocale(LC_ALL, "");
 
 	sleepStableReset();
 }
@@ -94,8 +104,6 @@ void termDestroy() {
 	if (!termInited)
 		return;
 	termInited = false;
-
-	setlocale(LC_ALL, "");
 
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &termiosOriginal);
 
@@ -112,73 +120,84 @@ void termDestroy() {
 		free(termBuffer);
 }
 
-void termReadSetBlocking(bool blocking) {
-	if (!termInited) {
-		fprintf(stderr, "Tried to set blocking when not inited");
-		return;
+void termSetSettings(TermSettings settings) {
+	if (termInited) {
+		if (settings.readBlocking != termSettings.readBlocking ||
+			settings.readTime != termSettings.readTime) {
+			termiosCurrent.c_cc[VMIN] = settings.readBlocking ? 1 : 0;
+			termiosCurrent.c_cc[VTIME] = (int)(settings.readTime * 10);
+			tcsetattr(STDIN_FILENO, TCSANOW, &termiosCurrent);
+		}
 	}
-	termiosCurrent.c_cc[VMIN] = blocking ? 1 : 0;
-	tcsetattr(STDIN_FILENO, TCSANOW, &termiosCurrent);
+	termSettings = settings;
 }
 
-char termRead() {
+TermSize termGetSize() {
+	struct winsize termSizeTemp;
+	if (ioctl(0, TIOCGWINSZ, &termSizeTemp) == -1)
+		abort();
+	const int w = termSizeTemp.ws_col;
+	const int h = termSizeTemp.ws_row;
+	termSize = (TermSize){w, h};
+	return termSize;
+}
+
+static char getChar() {
 	char c;
 	ssize_t n = read(STDIN_FILENO, &c, 1);
 	return n == 1 ? c : 0;
 }
 
-int termReadFancy(bool lower) {
-	char c = termRead();
+TermEvent termGetEvent() {
+	if (termInterrupted)
+		return (TermEvent){TERM_EVENT_INTERUPT, {}};
+	if (atomic_exchange(&termResized, false)) {
+		struct winsize termSizeTemp;
+		if (ioctl(0, TIOCGWINSZ, &termSizeTemp) != -1) {
+			const int w = termSizeTemp.ws_col;
+			const int h = termSizeTemp.ws_row;
+			if (w != termSize.w || h != termSize.h) {
+				termSize = (TermSize){w, h};
+				return (TermEvent){TERM_EVENT_RESIZED, {.resized = termSize}};
+			}
+		}
+	}
+	if (atomic_exchange(&termPaused, false)) {
+		if (termInited)
+			termDestroy();
+		raise(SIGSTOP);
+		if (!termInited)
+			termInit();
+		sleepStableReset();
+		return (TermEvent){TERM_EVENT_PAUSED, {}};
+	}
+
+	int key = 0;
+	char c = getChar();
 	if (c == '\x1b') {
-		c = termRead();
+		c = getChar();
 		if (c == '[') {
-			c = termRead();
+			c = getChar();
 			if (c == 'A')
-				return TERM_CHAR_UP;
+				key = TERM_CHAR_UP;
 			else if (c == 'B')
-				return TERM_CHAR_DOWN;
+				key = TERM_CHAR_DOWN;
 			else if (c == 'C')
-				return TERM_CHAR_RIGHT;
+				key = TERM_CHAR_RIGHT;
 			else if (c == 'D')
-				return TERM_CHAR_LEFT;
+				key = TERM_CHAR_LEFT;
 		}
 	} else {
-		return lower ? tolower(c) : c;
+		key = termSettings.lower ? tolower(c) : c;
 	}
-	return 0;
-}
 
-static TermSize termSize = {-1, -1};
+	if (termInterrupted)
+		return (TermEvent){TERM_EVENT_INTERUPT, {}};
 
-TermSize *termSizeUpdate() {
-	if (!atomic_exchange(&termResized, false))
-		return NULL;
-	struct winsize termSizeTemp;
-	if (ioctl(0, TIOCGWINSZ, &termSizeTemp) == -1)
-		return NULL;
-	const int w = termSizeTemp.ws_col;
-	const int h = termSizeTemp.ws_row;
-	if (w == termSize.w && h == termSize.h)
-		return NULL;
-	termSize = (TermSize){w, h};
-	return &termSize;
-}
-
-bool termWaitForUnpause() {
-	if (!atomic_exchange(&termPaused, false))
-		return false;
-
-	if (termInited)
-		termDestroy();
-
-	raise(SIGSTOP);
-
-	if (!termInited)
-		termInit();
-
-	sleepStableReset();
-
-	return true;
+	if (key > 0)
+		return (TermEvent){TERM_EVENT_KEY, {.key = key}};
+	else
+		return (TermEvent){TERM_EVENT_NONE, {}};
 }
 
 void sleepStableReset() { clock_gettime(CLOCK_MONOTONIC, &sleepStableNext); }

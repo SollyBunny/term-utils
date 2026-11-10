@@ -19,6 +19,7 @@ typedef struct {
 } Tile;
 static Tile *grid;
 static int sizeX, sizeY;
+static int cursorX, cursorY;
 static bool dead = false;
 
 static bool isBomb(int x, int y) {
@@ -70,15 +71,16 @@ static void drawTile(int x, int y, bool cursor) {
 }
 
 static void drawAll() {
-	printf("\x1b[48;5;237m"); // BG Gray
-	printf("\x1b[2J\x1b[H");  // Clear screen
-	printf("\x1b[0m");		  // Reset
+	printf("\x1b[48;5;237m");				  // BG Gray
+	printf("\x1b[%d;0H\x1b[1J\x1b[K", sizeY); // Clear screen
+	printf("\x1b[0m");						  // Reset
 	for (int y = 0; y < sizeY; ++y) {
 		for (int x = 0; x < sizeX; ++x) {
 			if (!isState(x, y, STATE_NONE))
 				drawTile(x, y, false);
 		}
 	}
+	drawTile(cursorX, cursorY, true);
 	fflush(stdout);
 }
 
@@ -110,14 +112,17 @@ static void destroy() {
 
 int main() {
 	randInit();
-	termInit();
 
-	TermSize termSize = *termSizeUpdate();
+	termInit();
+	termSetSettings(
+		(TermSettings){.lower = true, .readBlocking = true, .readTime = 0});
+
+	TermSize termSize = termGetSize();
 	sizeY = termSize.h;
 	sizeX = termSize.w / 2;
 
-	int cursorX = sizeX / 2;
-	int cursorY = sizeY / 2;
+	cursorX = sizeX / 2;
+	cursorY = sizeY / 2;
 
 	grid = malloc(sizeX * sizeY * sizeof(grid[0]));
 
@@ -141,36 +146,35 @@ int main() {
 		}
 	}
 
-	termReadSetBlocking(true);
-	printf("\x1b[48;5;237m"); // BG Gray
-	printf("\x1b[2J\x1b[H");  // Clear screen
-	printf("\x1b[0m");		  // Reset
+	printf("\x1b[48;5;237m");				  // BG Gray
+	printf("\x1b[%d;0H\x1b[1J\x1b[K", sizeY); // Clear screen
+	printf("\x1b[0m");						  // Reset
 	drawTile(cursorX, cursorY, true);
 	fflush(stdout);
 
 	bool wasTooSmall = false;
 	while (true) {
 		// Read input
-		int c = termReadFancy(true);
-		if (termInterrupted)
-			break;
-
-		if (termWaitForUnpause()) {
-			termReadSetBlocking(true);
+		TermEvent event = termGetEvent();
+		int key = 0;
+		if (event.type == TERM_EVENT_INTERUPT) {
+			destroy();
+		} else if (event.type == TERM_EVENT_RESIZED) {
+			termSize = event.data.resized;
+		} else if (event.type == TERM_EVENT_PAUSED) {
 			drawAll();
+			continue;
+		} else if (event.type == TERM_EVENT_KEY) {
+			key = event.data.key;
 		}
-
-		const TermSize *termSizeNew = termSizeUpdate();
-		if (termSizeNew)
-			termSize = *termSizeNew;
 
 		if (sizeX * 2 > termSize.w || sizeY > termSize.h) {
 			wasTooSmall = true;
 
 			const char line1[] = "Terminal too small";
 			char line2[64];
-			const int line2Size =
-				snprintf(line2, sizeof(line2), "needs %d x %d", sizeX * 2, sizeY + 1);
+			const int line2Size = snprintf(
+				line2, sizeof(line2), "needs %d x %d", sizeX * 2, sizeY + 1);
 
 			printf("\x1b[0m"); // Reset
 			printf("\x1b[2J"); // Clear screen
@@ -181,7 +185,7 @@ int main() {
 
 			fflush(stdout);
 			continue;
-		} else if (wasTooSmall) {
+		} else {
 			wasTooSmall = false;
 			drawAll();
 		}
@@ -189,15 +193,15 @@ int main() {
 		// Clear last cursor
 		drawTile(cursorX, cursorY, false);
 
-		if (c == 'w' || c == TERM_CHAR_UP) {
+		if (key == 'w' || key == TERM_CHAR_UP) {
 			cursorY -= 1;
-		} else if (c == 's' || c == TERM_CHAR_DOWN) {
+		} else if (key == 's' || key == TERM_CHAR_DOWN) {
 			cursorY += 1;
-		} else if (c == 'd' || c == TERM_CHAR_RIGHT) {
+		} else if (key == 'd' || key == TERM_CHAR_RIGHT) {
 			cursorX += 1;
-		} else if (c == 'a' || c == TERM_CHAR_LEFT) {
+		} else if (key == 'a' || key == TERM_CHAR_LEFT) {
 			cursorX -= 1;
-		} else if (c == 'q') {
+		} else if (key == 'q') {
 			const Tile *tile = &grid[cursorY * sizeX + cursorX];
 			if (tile->state == STATE_NONE) {
 				if (tile->bomb == 9) {
@@ -236,7 +240,7 @@ int main() {
 					}
 				}
 			}
-		} else if (c == 'e') {
+		} else if (key == 'e') {
 			Tile *tile = &grid[cursorY * sizeX + cursorX];
 			if (tile->state == STATE_FLAG) {
 				tile->state = STATE_NONE;
@@ -275,6 +279,4 @@ int main() {
 		drawTile(cursorX, cursorY, true);
 		fflush(stdout);
 	}
-
-	destroy();
 }

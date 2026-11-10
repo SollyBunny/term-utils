@@ -10,25 +10,42 @@ static const int TERM_CHAR_DOWN = 256 + 'B';
 static const int TERM_CHAR_RIGHT = 256 + 'C';
 static const int TERM_CHAR_LEFT = 256 + 'D';
 
-void termInit();
-void termDestroy();
-char termRead();
-int termReadFancy(bool lower);
-void termReadSetBlocking(bool blocking);
+typedef struct {
+	bool lower;
+	bool readBlocking;
+	float readTime;
+} TermSettings;
 
 typedef struct {
 	int w;
 	int h;
 } TermSize;
 
-/**
- * Always returns first time
- * Copy this object before next call
- */
-TermSize *termSizeUpdate();
+enum TermEventType {
+	TERM_EVENT_NONE = 0,
+	TERM_EVENT_INTERUPT,
+	TERM_EVENT_RESIZED,
+	TERM_EVENT_PAUSED,
+	TERM_EVENT_KEY,
+};
 
-// Waits for the terminal to be moved into the FG
-bool termWaitForUnpause();
+typedef struct {
+	enum TermEventType type;
+	union {
+		TermSize resized;
+		int key;
+	} data;
+} TermEvent;
+
+void termInit();
+void termDestroy();
+
+void termSetSettings(TermSettings settings);
+
+TermSize termGetSize();
+TermEvent termGetEvent();
+
+TermEvent termEvent();
 
 // Not in own files due to linkage with interruption and pausing
 void sleepStableReset();

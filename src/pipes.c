@@ -16,7 +16,8 @@ static const char *PIPE_CHARS[][12] = {
 	// https://github.com/pipeseroni/pipes.sh#contents
 	[0] = {"┃", "┏", "┓", "┛", "━", "┓", "┗", "┃", "┛", "┗", "┏", "━"},
 	[1] = {"│", "╭", "╮", "╯", "─", "╮", "╰", "│", "╯", "╰", "╭", "─"},
-	[2] = {"│", "┌", "┐", "┘", "─", "┐", "└", "│", "┘", "└", "┌", "─"}, // Viewable on tty
+	[2] = {"│", "┌", "┐", "┘", "─", "┐", "└", "│", "┘", "└", "┌",
+		   "─"}, // Viewable on tty
 	[3] = {"║", "╔", "╗", "╝", "═", "╗", "╚", "║", "╝", "╚", "╔", "═"},
 	[4] = {"|", "+", "+", "+", "-", "+", "+", "|", "+", "+", "+", "-"},
 	[5] = {"|", "/", "\\", "/", "-", "\\", "\\", "|", "/", "\\", "/", "-"},
@@ -113,11 +114,8 @@ static inline Pipe pipeNew() {
 	};
 }
 
-static void handleResize() {
-	const TermSize *termSizeNew = termSizeUpdate();
-	if (!termSizeNew)
-		return;
-	termSize = *termSizeNew;
+static void handleResize(const TermEvent *event) {
+	termSize = event->data.resized;
 
 	pipesCount = (size_t)termSize.w * (size_t)termSize.h / 100;
 	pipes = realloc(pipes, pipesCount * sizeof(pipes[0]));
@@ -155,29 +153,37 @@ int main(int argc, char **argv) {
 	pipeChars = PIPE_CHARS[pipeSet];
 
 	randInit();
+
+	termSetSettings(
+		(TermSettings){.lower = true, .readBlocking = false, .readTime = 0});
 	termInit();
 
 	bool paused = false;
 	while (true) {
 		if (!paused)
 			sleepStable(frameDelay);
-		if (termInterrupted)
+
+		TermEvent event = termGetEvent();
+		if (event.type == TERM_EVENT_INTERUPT) {
 			break;
-		termWaitForUnpause();
-		const char c = termReadFancy(true);
-		if (c == ' ') {
-			if (paused) {
-				paused = false;
-				termReadSetBlocking(false);
+		} else if (event.type == TERM_EVENT_RESIZED) {
+			handleResize(&event);
+		} else if (event.type == TERM_EVENT_PAUSED) {
+			for (size_t i = 0; i < pipesCount; ++i)
+				pipes[i] = pipeNew();
+		} else if (event.type == TERM_EVENT_KEY) {
+			int key = event.data.key;
+			if (key == ' ') {
+				paused = !paused;
 				sleepStableReset();
-			} else {
-				paused = true;
-				termReadSetBlocking(true);
+				termSetSettings((TermSettings){
+					.lower = true, .readBlocking = paused, .readTime = 0});
 			}
 		}
-		handleResize();
+
 		if (paused)
 			continue;
+
 		for (size_t i = 0; i < pipesCount; ++i) {
 			pipeSim(&pipes[i]);
 			pipeDraw(&pipes[i]);

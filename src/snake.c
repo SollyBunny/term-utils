@@ -147,7 +147,8 @@ static unsigned char clampedAddReflect(unsigned char a, int b) {
 static void draw() {
 	// Draw snake
 	for (int i = snake.len - 1; i >= 0; --i) {
-		printf("\x1b[%d;%dH", CIRC_INDEX(snake, Pos, i).y + 1, CIRC_INDEX(snake, Pos, i).x * 2 + 1);
+		printf("\x1b[%d;%dH", CIRC_INDEX(snake, Pos, i).y + 1,
+			   CIRC_INDEX(snake, Pos, i).x * 2 + 1);
 		const int pos = i / fruitValue;
 		switch (color.mode) {
 		case ARGPARSE_COLOR_MODE_NORMAL:
@@ -239,13 +240,18 @@ static bool play() {
 	Pos dir = DIR_NONE; // dx and dy
 	while (true) {
 		sleepStable(delaySeconds);
-		if (termInterrupted)
+		TermEvent event = termGetEvent();
+		Pos newDir = DIR_NONE;
+		if (event.type == TERM_EVENT_INTERUPT) {
 			destroy();
-
-		if (termWaitForUnpause())
+		} else if (event.type == TERM_EVENT_RESIZED) {
+			/* TODO */
+		} else if (event.type == TERM_EVENT_PAUSED) {
 			dir = DIR_NONE;
+		} else if (event.type == TERM_EVENT_KEY) {
+			newDir = charToDir(event.data.key);
+		}
 
-		Pos newDir = charToDir(termReadFancy(true));
 		// If invalid/no input or opposite input
 		if (posEqual(newDir, DIR_NONE) || posEqual(newDir, posFlip(dir))) {
 			// Can't do anything with no input
@@ -332,8 +338,10 @@ int main(int argc, char **argv) {
 
 	randInit();
 	termInit();
+	termSetSettings(
+		(TermSettings){.lower = true, .readBlocking = false, .readTime = 0});
 
-	termSize = *termSizeUpdate();
+	termSize = termGetSize();
 	sizeX = termSize.w / 2;
 	sizeY = termSize.h;
 
@@ -359,15 +367,19 @@ int main(int argc, char **argv) {
 		}
 		fflush(stdout);
 
-		char c;
-		termReadSetBlocking(true);
+		int key = 0;
+		termSetSettings(
+			(TermSettings){.lower = true, .readBlocking = true, .readTime = 0});
 		do { // wait for valid input, if y reset, otherwise quit
-			c = termRead();
-			if (termInterrupted)
+			TermEvent event = termGetEvent();
+			if (event.type == TERM_EVENT_INTERUPT)
 				destroy();
-		} while (c != 'y' && c != 'n');
-		termReadSetBlocking(false);
-		if (c == 'n')
+			else if (event.type == TERM_EVENT_KEY)
+				key = event.data.key;
+		} while (key != 'y' && key != 'n');
+		termSetSettings((TermSettings){
+			.lower = true, .readBlocking = false, .readTime = 0});
+		if (key == 'n')
 			break;
 	}
 
