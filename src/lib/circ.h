@@ -13,8 +13,9 @@ typedef struct {
 CircBuffer circCreate(size_t cap, size_t elementSize);
 void circFree(CircBuffer *buf);
 
-void *circPop(CircBuffer *buf);
-void *circAdd(CircBuffer *buf);
+void *circPopBack(CircBuffer *buf);
+void *circAddFront(CircBuffer *buf);
+void *circAddBack(CircBuffer *buf);
 
 #define CIRC_INDEX(buf, type, i)                                               \
 	(((type *)(buf).data)[((i) + (buf).head) % (buf).cap])

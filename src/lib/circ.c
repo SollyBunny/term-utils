@@ -27,7 +27,7 @@ void circFree(CircBuffer *buf) {
 	buf->cap = 0;
 }
 
-void *circPop(CircBuffer *buf) {
+void *circPopBack(CircBuffer *buf) {
 	if (!buf || !buf->data || buf->len == 0)
 		return NULL;
 
@@ -44,7 +44,7 @@ void *circPop(CircBuffer *buf) {
 	return element;
 }
 
-void *circAdd(CircBuffer *buf) {
+void *circAddFront(CircBuffer *buf) {
 	if (!buf || !buf->data)
 		return NULL;
 
@@ -83,4 +83,45 @@ void *circAdd(CircBuffer *buf) {
 
 	// Return the new front element
 	return (char *)buf->data + buf->head * buf->elementSize;
+}
+
+void *circAddBack(CircBuffer *buf) {
+    if (!buf || !buf->data)
+        return NULL;
+
+    if (buf->len == buf->cap) {
+        // Double capacity
+        const size_t newCap = buf->cap * 2;
+
+        if (newCap < buf->cap || newCap > SIZE_MAX / buf->elementSize)
+            abort();
+
+        void *newData = malloc(newCap * buf->elementSize);
+
+        if (!newData)
+            abort();
+
+        // Copy existing elements, preserving logical order
+        for (size_t i = 0; i < buf->len; i++) {
+            size_t index = (buf->head + i) % buf->cap;
+
+            memcpy((char *)newData + i * buf->elementSize,
+                   (char *)buf->data + index * buf->elementSize,
+                   buf->elementSize);
+        }
+
+        free(buf->data);
+
+        buf->data = newData;
+        buf->cap = newCap;
+        buf->head = 0;
+    }
+
+    // Calculate the index after the current back element
+    size_t index = (buf->head + buf->len) % buf->cap;
+
+    buf->len++;
+
+    // Return the new back element
+    return (char *)buf->data + index * buf->elementSize;
 }

@@ -226,7 +226,7 @@ static bool play() {
 	snake = circCreate(initialSnakeLen, sizeof(Pos));
 	// Set all snake positions to spawn point
 	for (int i = 0; i < initialSnakeLen; ++i)
-		*((Pos *)circAdd(&snake)) = (Pos){sizeX / 2, sizeY / 2};
+		*((Pos *)circAddFront(&snake)) = (Pos){sizeX / 2, sizeY / 2};
 
 	// Create fruit
 	placeFruit();
@@ -286,8 +286,8 @@ static bool play() {
 		grace = 0;
 
 		// Move all snake peices along by one
-		circPop(&snake);
-		*((Pos *)circAdd(&snake)) = snakeNew;
+		circPopBack(&snake);
+		*((Pos *)circAddFront(&snake)) = snakeNew;
 
 		// Fruit collision
 		if (posEqual(snakeNew, fruitPos)) {
@@ -297,8 +297,9 @@ static bool play() {
 			placeFruit();
 
 			// Add new snake bits
+			const Pos snakeEnd = CIRC_INDEX(snake, Pos, snake.len - 1);
 			for (size_t i = 0; i < (size_t)fruitValue; ++i)
-				*((Pos *)circAdd(&snake)) = snakeNew;
+				*((Pos *)circAddBack(&snake)) = snakeEnd;
 		}
 
 		const int score = ((int)snake.len - initialSnakeLen) / fruitValue;
