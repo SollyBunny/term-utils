@@ -90,24 +90,23 @@ static void placeFruit() {
 	}
 }
 
-static bool doCollisionWithSnakeAndBorder(Pos *ppos) {
-	const Pos pos = *ppos;
-	// Impossible to collide with first 3 parts
-	// Allow colliding into last part as it will move by the time we get there
-	for (size_t i = 3; i < snake.len - 1; ++i) {
-		if (posEqual(CIRC_INDEX(snake, Pos, i), pos))
+static bool doCollisionWithSnakeAndBorder(Pos *pos) {
+	if (pos->x < 0 || pos->x >= sizeX) {
+		if (loop)
+			pos->x = (pos->x % sizeX + sizeX) % sizeX;
+		else
+			return true;
+	} else if (pos->y < 0 || pos->y >= sizeY) {
+		if (loop)
+			pos->y = (pos->y % sizeY + sizeY) % sizeY;
+		else
 			return true;
 	}
 
-	if (pos.x < 0 || pos.x >= sizeX) {
-		if (loop)
-			ppos->x = (pos.x % sizeX + sizeX) % sizeX;
-		else
-			return true;
-	} else if (pos.y < 0 || pos.y >= sizeY) {
-		if (loop)
-			ppos->y = (pos.y % sizeY + sizeY) % sizeY;
-		else
+	// Impossible to collide with first 3 parts
+	// Allow colliding into last part as it will move by the time we get there
+	for (size_t i = 3; i < snake.len - 1; ++i) {
+		if (posEqual(CIRC_INDEX(snake, Pos, i), *pos))
 			return true;
 	}
 
