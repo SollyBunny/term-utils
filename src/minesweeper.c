@@ -55,7 +55,7 @@ static void drawTile(int x, int y, bool cursor) {
 		if (tile->bomb == 0)
 			printf("  ");
 		else if (tile->bomb == 9)
-			printf("**");
+			printf("ꓘk");
 		else
 			printf("\x1b[38;5;%um%u ", TILE_COLORS[tile->bomb], tile->bomb);
 		break;
@@ -66,6 +66,18 @@ static void drawTile(int x, int y, bool cursor) {
 			printf("\x1b[48;5;237m");
 		printf("\x1b[38;5;196m|>");
 		break;
+	}
+}
+
+static void drawAll() {
+	printf("\x1b[48;5;237m"); // BG Gray
+	printf("\x1b[2J\x1b[H");  // Clear screen
+	printf("\x1b[0m");		  // Reset
+	for (int y = 0; y < sizeY; ++y) {
+		for (int x = 0; x < sizeX; ++x) {
+			if (!isState(x, y, STATE_NONE))
+				drawTile(x, y, false);
+		}
 	}
 	fflush(stdout);
 }
@@ -89,18 +101,6 @@ static void recurseFind(int x, int y, bool cursor) {
 	drawTile(x, y, cursor);
 }
 
-static void redraw() {
-	printf("\x1b[48;5;237m"); // BG Gray
-	printf("\x1b[2J\x1b[H");  // Clear screen
-	printf("\x1b[0m");		  // Reset
-	for (int y = 0; y < sizeY; ++y) {
-		for (int x = 0; x < sizeX; ++x) {
-			if (!isState(x, y, STATE_NONE))
-				drawTile(x, y, false);
-		}
-	}
-}
-
 static void destroy() {
 	termDestroy();
 	if (dead)
@@ -112,9 +112,9 @@ int main() {
 	randInit();
 	termInit();
 
-	TermSize *termSize = termSizeUpdate();
-	sizeY = termSize->h;
-	sizeX = termSize->w / 2;
+	TermSize termSize = *termSizeUpdate();
+	sizeY = termSize.h;
+	sizeX = termSize.w / 2;
 
 	int cursorX = sizeX / 2;
 	int cursorY = sizeY / 2;
@@ -146,6 +146,9 @@ int main() {
 	printf("\x1b[2J\x1b[H");  // Clear screen
 	printf("\x1b[0m");		  // Reset
 	drawTile(cursorX, cursorY, true);
+	fflush(stdout);
+
+	bool wasTooSmall = false;
 	while (true) {
 		// Read input
 		int c = termReadFancy(true);
@@ -154,7 +157,33 @@ int main() {
 
 		if (termWaitForUnpause()) {
 			termReadSetBlocking(true);
-			redraw();
+			drawAll();
+		}
+
+		const TermSize *termSizeNew = termSizeUpdate();
+		if (termSizeNew)
+			termSize = *termSizeNew;
+
+		if (sizeX * 2 > termSize.w || sizeY > termSize.h) {
+			wasTooSmall = true;
+
+			const char line1[] = "Terminal too small";
+			char line2[64];
+			const int line2Size =
+				snprintf(line2, sizeof(line2), "needs %d x %d", sizeX * 2, sizeY + 1);
+
+			printf("\x1b[0m"); // Reset
+			printf("\x1b[2J"); // Clear screen
+			printf("\x1b[%d;%dH%s", termSize.h / 2 + 1,
+				   termSize.w / 2 + 1 - (int)sizeof(line1) / 2, line1);
+			printf("\x1b[%d;%dH%s", termSize.h / 2 + 1 + 1,
+				   termSize.w / 2 + 1 - line2Size / 2, line2);
+
+			fflush(stdout);
+			continue;
+		} else if (wasTooSmall) {
+			wasTooSmall = false;
+			drawAll();
 		}
 
 		// Clear last cursor
@@ -244,6 +273,7 @@ int main() {
 
 		// Draw new cursorPos
 		drawTile(cursorX, cursorY, true);
+		fflush(stdout);
 	}
 
 	destroy();
