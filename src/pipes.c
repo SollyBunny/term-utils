@@ -66,7 +66,8 @@ static void pipeSim(Pipe *pipe) {
 		pipe->pos.y += 1;
 	else if (pipe->dir == 3)
 		pipe->pos.x -= 1;
-	if (pipe->pos.x < 0 || pipe->pos.x >= termSize.w || pipe->pos.y < 0 || pipe->pos.y >= termSize.h) {
+	if (pipe->pos.x < 0 || pipe->pos.x >= termSize.w || pipe->pos.y < 0 ||
+		pipe->pos.y >= termSize.h) {
 		pipe->pos.x = (pipe->pos.x % termSize.w + termSize.w) % termSize.w;
 		pipe->pos.y = (pipe->pos.y % termSize.h + termSize.h) % termSize.h;
 		pipe->nonce = randGet(0, 255 * 255 * 255);
@@ -83,14 +84,8 @@ static void pipeSim(Pipe *pipe) {
 			pipe->charIndex += 2;
 		}
 	}
-	const unsigned char charIndexMap[] = {
-		0, 1, 2,
-		4, 5, 3,
-		7, 8, 6,
-		11, 9, 10
-	};
+	const unsigned char charIndexMap[] = {0, 1, 2, 4, 5, 3, 7, 8, 6, 11, 9, 10};
 	pipe->charIndex = charIndexMap[pipe->charIndex];
-
 }
 
 static void pipeDraw(const Pipe *pipe) {
@@ -139,7 +134,7 @@ static void handleResize() {
 	const size_t pipesCountOld = pipesCount;
 	pipesCount = (size_t)termSize.w * (size_t)termSize.h / 100;
 	pipes = realloc(pipes, pipesCount * sizeof(pipes[0]));
-	for (size_t i = pipesCountOld; i < pipesCount; ++i)
+	for (size_t i = 0; i < pipesCount; ++i)
 		pipes[i] = pipeNew();
 }
 
