@@ -45,18 +45,6 @@ static void destroy() {
 	free(pipes);
 }
 
-static unsigned char randomizeColorComponent(unsigned char c) {
-	int delta = randGet(-colorVariation / 2, colorVariation / 2);
-	int result = c + delta;
-
-	if (result < 0)
-		result = 0;
-	if (result > 255)
-		result = 255;
-
-	return (unsigned char)result;
-}
-
 static void pipeSim(Pipe *pipe) {
 	if (pipe->dir == 0)
 		pipe->pos.y -= 1;
@@ -131,7 +119,6 @@ static void handleResize() {
 		return;
 	termSize = *termSizeNew;
 
-	const size_t pipesCountOld = pipesCount;
 	pipesCount = (size_t)termSize.w * (size_t)termSize.h / 100;
 	pipes = realloc(pipes, pipesCount * sizeof(pipes[0]));
 	for (size_t i = 0; i < pipesCount; ++i)
