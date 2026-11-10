@@ -205,18 +205,7 @@ static void handleResize(const TermEvent *event) {
 				line->active = false;
 		}
 	}
-	// Fill new rows
-	if (termSize.h > termSizeOld.h) {
-		for (size_t i = 0; i < maxPossibleLineIndex; ++i) {
-			Line *line = &lines[i];
-			if (line->active)
-				continue;
-			if (line->y >= termSizeOld.h)
-				lineDrawWhole(line);
-		}
-	}
-	// Flush
-	fflush(stdout);
+	redrawAll();
 }
 
 static void destroy() {
