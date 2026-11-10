@@ -145,14 +145,16 @@ static unsigned char clampedAddReflect(unsigned char a, int b) {
 
 static void draw() {
 	// Draw snake
+	int lastColorHash = -1;
+	int colorHash;
 	for (int i = snake.len - 1; i >= 0; --i) {
-		printf("\x1b[%d;%dH", CIRC_INDEX(snake, Pos, i).y + 1,
-			   CIRC_INDEX(snake, Pos, i).x * 2 + 1);
-		const int pos = i / fruitValue;
+		const Pos *pos = &CIRC_INDEX(snake, Pos, i);
+		printf("\x1b[%d;%dH", pos->y + 1, pos->x * 2 + 1);
+		const int j = i / fruitValue;
 		switch (color.mode) {
 		case ARGPARSE_COLOR_MODE_NORMAL:
 		case ARGPARSE_COLOR_MODE_RANDOM: {
-			const int d = pos % 2 == 0 ? -20 : 20;
+			const int d = j % 2 == 0 ? -20 : 20;
 			unsigned char r, g, b;
 			if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
 				r = clampedAddReflect(color.r, d);
@@ -168,20 +170,35 @@ static void draw() {
 				g = clampedAddReflect(h / 255 % 255, d);
 				b = clampedAddReflect(h / 255 / 255 % 255, d);
 			}
-			printf("\x1b[48;2;%u;%u;%um  ", (unsigned)r, (unsigned)g,
-				   (unsigned)b);
+			colorHash = (int)r + 255 * (int)g + 255 * 255 * (int)b;
+			if (colorHash != lastColorHash) {
+				lastColorHash = colorHash;
+				printf("\x1b[48;2;%u;%u;%um", (unsigned)r, (unsigned)g,
+					   (unsigned)b);
+			}
 			break;
 		}
 		case ARGPARSE_COLOR_MODE_RAINBOW:
-		case ARGPARSE_COLOR_MODE_MONOCHROME:
-			printf("\x1b[48;5;%dm  ", color.mode == ARGPARSE_COLOR_MODE_RAINBOW
-										  ? colorsRainbow(pos)
-										  : colorsMonochrome(pos));
-			break;
-		case ARGPARSE_COLOR_MODE_BASIC:
-			printf("\x1b[10%cm  ", pos % 2 == 0 ? '2' : '3');
+		case ARGPARSE_COLOR_MODE_MONOCHROME: {
+			unsigned char c = color.mode == ARGPARSE_COLOR_MODE_RAINBOW
+								  ? colorsRainbow(j)
+								  : colorsMonochrome(j);
+			colorHash = c;
+			if (colorHash != lastColorHash) {
+				lastColorHash = colorHash;
+				printf("\x1b[48;5;%um", c);
+			}
 			break;
 		}
+		case ARGPARSE_COLOR_MODE_BASIC:
+			colorHash = j % 2;
+			if (colorHash != lastColorHash) {
+				lastColorHash = colorHash;
+				printf("\x1b[10%cm", j % 2 == 0 ? '2' : '3');
+			}
+			break;
+		}
+		fputs("  ", stdout);
 	}
 
 	// Draw fruit
