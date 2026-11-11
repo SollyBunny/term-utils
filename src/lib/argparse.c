@@ -44,8 +44,8 @@ static bool parseHexColor(const char *value, ArgparseColor *color) {
 			return false;
 
 		*color = (ArgparseColor){
-			(unsigned char)(r * 17), (unsigned char)(g * 17),
-			(unsigned char)(b * 17), ARGPARSE_COLOR_MODE_NORMAL};
+			(uint8_t)(r * 17), (uint8_t)(g * 17),
+			(uint8_t)(b * 17), ARGPARSE_COLOR_MODE_NORMAL};
 		return true;
 	}
 
@@ -61,8 +61,8 @@ static bool parseHexColor(const char *value, ArgparseColor *color) {
 			return false;
 
 		*color = (ArgparseColor){
-			(unsigned char)(r1 * 16 + r2), (unsigned char)(g1 * 16 + g2),
-			(unsigned char)(b1 * 16 + b2), ARGPARSE_COLOR_MODE_NORMAL};
+			(uint8_t)(r1 * 16 + r2), (uint8_t)(g1 * 16 + g2),
+			(uint8_t)(b1 * 16 + b2), ARGPARSE_COLOR_MODE_NORMAL};
 		return true;
 	}
 
@@ -97,8 +97,8 @@ static bool parseDecimalColor(const char *value, ArgparseColor *color) {
 		return false;
 
 	*color = (ArgparseColor){
-		(unsigned char)components[0], (unsigned char)components[1],
-		(unsigned char)components[2], ARGPARSE_COLOR_MODE_NORMAL};
+		(uint8_t)components[0], (uint8_t)components[1],
+		(uint8_t)components[2], ARGPARSE_COLOR_MODE_NORMAL};
 	return true;
 }
 

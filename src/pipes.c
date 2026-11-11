@@ -31,9 +31,9 @@ typedef struct {
 
 typedef struct {
 	Pos pos;
-	unsigned char dir;
+	uint8_t dir;
 	int nonce;
-	unsigned char charIndex;
+	uint8_t charIndex;
 } Pipe;
 
 static TermSize termSize = {};
@@ -72,7 +72,7 @@ static void pipeSim(Pipe *pipe) {
 			pipe->charIndex += 2;
 		}
 	}
-	const unsigned char charIndexMap[] = {0, 1, 2, 4, 5, 3, 7, 8, 6, 11, 9, 10};
+	const uint8_t charIndexMap[] = {0, 1, 2, 4, 5, 3, 7, 8, 6, 11, 9, 10};
 	pipe->charIndex = charIndexMap[pipe->charIndex];
 }
 

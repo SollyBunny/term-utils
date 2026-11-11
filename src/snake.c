@@ -132,7 +132,7 @@ static uint8_t colorsMonochrome(int i) {
 	return b + (i <= (w - b) ? i : (w - b) * 2 - i);
 }
 
-static uint8_t clampedAddReflect(unsigned char a, int b) {
+static uint8_t clampedAddReflect(uint8_t a, int b) {
 	const int res = (int)a + b;
 	if (res < 0)
 		return -res;
@@ -193,7 +193,7 @@ static void draw() {
 	switch (snakeColor.mode) {
 	case ARGPARSE_COLOR_MODE_NORMAL:
 	case ARGPARSE_COLOR_MODE_RANDOM: {
-		unsigned char r, g, b;
+		uint8_t r, g, b;
 		if (snakeColor.mode == ARGPARSE_COLOR_MODE_NORMAL) {
 			r = snakeColor.r;
 			g = snakeColor.g;

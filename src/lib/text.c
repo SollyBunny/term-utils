@@ -1,13 +1,14 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 typedef struct {
-	unsigned char x;
-	unsigned char y;
+	uint8_t x;
+	uint8_t y;
 	// number of blacks/number of whites
 	// 254 is newline
 	// 255 is end
-	unsigned char d[128];
+	uint8_t d[128];
 } Glyph;
 
 static const Glyph FONT_DATA[256] = {
@@ -133,7 +134,7 @@ static void drawGlyph(int x, int y, const Glyph *img) {
 	bool black = true;
 
 	for (int i = 0; i < 128; i++) {
-		unsigned char n = img->d[i];
+		uint8_t n = img->d[i];
 
 		if (n == 255)
 			break;
@@ -165,7 +166,7 @@ void drawText(int x, int y, const char *string, bool center) {
 		if (*p == ' ') {
 			width += 2;
 		} else {
-			const Glyph *glyph = &FONT_DATA[(unsigned char)*p];
+			const Glyph *glyph = &FONT_DATA[(uint8_t)*p];
 			width += glyph->x;
 			if (glyph->y > height)
 				height = glyph->y;
@@ -185,7 +186,7 @@ void drawText(int x, int y, const char *string, bool center) {
 			continue;
 		}
 
-		const Glyph *glyph = &FONT_DATA[(unsigned char)*p];
+		const Glyph *glyph = &FONT_DATA[(uint8_t)*p];
 
 		drawGlyph(cursor, y, glyph);
 

@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
 	char _;
@@ -31,7 +32,7 @@ enum ArgparseColorMode {
 };
 
 typedef struct {
-	unsigned char r, g, b;
+	uint8_t r, g, b;
 	enum ArgparseColorMode mode;
 } ArgparseColor;
 
