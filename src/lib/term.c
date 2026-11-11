@@ -34,6 +34,14 @@ static struct timespec sleepStableNext = {};
 static TermSettings termSettings;
 static TermSize termSize = {0, 0};
 
+static bool cleanupRegistered = false;
+
+static void cleanup() {
+	termDestroy();
+	fclose(stdout);
+	free(termBuffer);
+}
+
 static void handleSignal(int sig) {
 	switch (sig) {
 	case SIGWINCH:
@@ -56,6 +64,11 @@ void termInit() {
 		abort();
 	}
 	termInited = true;
+
+	if (!cleanupRegistered) {
+		cleanupRegistered = true;
+		atexit(cleanup);
+	}
 
 	// Setup handlers
 	struct sigaction sa = {0};
@@ -114,10 +127,6 @@ void termDestroy() {
 		   "\x1b[0m"	 // Reset text attributes (colors, bold, etc.)
 	);
 	fflush(stdout);
-
-	setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
-	if (termBuffer)
-		free(termBuffer);
 }
 
 void termSetSettings(TermSettings settings) {
