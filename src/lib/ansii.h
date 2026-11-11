@@ -21,17 +21,18 @@ static inline AnsiiColor ansii256(uint8_t v) {
 
 static inline void ansiiColor(AnsiiColor color, bool bg) {
 	if (color.type == 1) {
-		printf("\x1b[%c8;2;%u;%u;%um", bg ? '4': '3', color.r, color.g, color.b);
+		printf("\x1b[%c8;2;%u;%u;%um", bg ? '4' : '3', color.r, color.g,
+			   color.b);
 	} else {
 		if (color.r <= 7) {
-			printf("\x1b[%c%cm", bg ? '4': '3', '0' + color.r);
+			printf("\x1b[%c%cm", bg ? '4' : '3', '0' + color.r);
 		} else if (color.r >= 8 && color.r <= 15) {
 			if (bg)
 				printf("\x1b[10%cm", '0' + color.r);
 			else
 				printf("\x1b[9%cm", '0' + color.r);
 		} else {
-			printf("\x1b[%c8;5;%um", bg ? '4': '3', color.r);
+			printf("\x1b[%c8;5;%um", bg ? '4' : '3', color.r);
 		}
 	}
 }
@@ -39,17 +40,15 @@ static inline void ansiiColor(AnsiiColor color, bool bg) {
 static inline void ansiiFg(AnsiiColor color) { ansiiColor(color, false); }
 static inline void ansiiBg(AnsiiColor color) { ansiiColor(color, true); }
 
-static inline void ansiiReset() {
-	printf("\x1b[0m");
-}
+static inline void ansiiReset() { printf("\x1b[0m"); }
 
-static inline void ansiiClearScreen() {
-	printf("\x1b[2J");
-}
+static inline void ansiiResetFg() { printf("\x1b[39m"); }
 
-static inline void ansiiBold() {
-	printf("\x1b[1m");
-}
+static inline void ansiiResetBg() { printf("\x1b[49m"); }
+
+static inline void ansiiClearScreen() { printf("\x1b[2J"); }
+
+static inline void ansiiBold() { printf("\x1b[1m"); }
 
 static inline void ansiiMove(int x, int y) {
 	printf("\x1b[%d;%dH\n", y + 1, x + 1);

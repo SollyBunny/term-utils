@@ -39,22 +39,33 @@ static uint8_t colorsMonochrome(int i) {
 static void printChunk(const char *s, size_t n) {
 	static int x = 0;
 	static int y = 0;
+	static bool bgColored = false;
+	static bool boldApplied = false;
 	for (size_t i = 0; i < n; ++i) {
 		const char c = s[i];
 		switch (c) {
 		case ' ':
+			if (bgColored) {
+				ansiiResetBg();
+				bgColored = false;
+			}
 			putchar(' ');
 			++x;
 			break;
 		case '\t':
+			if (bgColored) {
+				ansiiResetBg();
+				bgColored = false;
+			}
 			fputs("    ", stdout);
 			x += 4;
 			break;
 		case '\n':
-			ansiiReset();
+			if (bgColored) {
+				ansiiResetBg();
+				bgColored = false;
+			}
 			putchar('\n');
-			if (drawBold)
-				ansiiBold();
 			x = 0;
 			++y;
 			break;
@@ -95,8 +106,14 @@ static void printChunk(const char *s, size_t n) {
 				color = ansii256(colorsBasic(pos));
 				break;
 			}
+			if (!boldApplied && drawBold) {
+				boldApplied = true;
+				ansiiBold();
+			}
 			ansiiColor(color, colorInvert);
 			putchar(c);
+			if (colorInvert)
+				bgColored = true;
 			++x;
 			break;
 		}
@@ -142,9 +159,6 @@ int main(int argc, char **argv) {
 
 	if (textColor.mode == ARGPARSE_COLOR_MODE_RANDOM)
 		randInit();
-
-	if (drawBold)
-		ansiiBold();
 
 	if (isHelp) {
 		const char help[] =
