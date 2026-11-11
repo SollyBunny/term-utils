@@ -1,17 +1,19 @@
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "lib/ansii.h"
 #include "lib/argparse.h"
 #include "lib/rand.h"
 
 typedef ArgparseColor Color;
 
-static Color color;
+static Color textColor;
 static bool colorInvert;
 static bool drawBold;
 
-static unsigned char clampedAddReflect(unsigned char a, int b) {
+static uint8_t clampedAddReflect(uint8_t a, int b) {
 	const int res = (int)a + b;
 	if (res < 0)
 		return -res;
@@ -20,17 +22,16 @@ static unsigned char clampedAddReflect(unsigned char a, int b) {
 	return res;
 }
 
-static int colorsBasic(int i) {
-	static int colors[] = {196, 202, 208, 214, 220, 226, 190, 154, 118,
-						   82,	46,	 48,  49,  50,	51,	 45,  39,  33,
-						   27,	21,	 57,  93,  129, 165, 201};
-	static int colorSize = sizeof(colors) / (sizeof(colors[0]));
-	return colors[i % colorSize];
+static uint8_t colorsBasic(int i) {
+	static uint8_t colors[] = {196, 202, 208, 214, 220, 226, 190, 154, 118,
+							   82,	46,	 48,  49,  50,	51,	 45,  39,  33,
+							   27,	21,	 57,  93,  129, 165, 201};
+	return colors[i % (sizeof(colors) / (sizeof(colors[0])))];
 }
 
-static int colorsMonochrome(int i) {
-	const int b = 238;
-	const int w = 255;
+static uint8_t colorsMonochrome(int i) {
+	const uint8_t b = 238;
+	const uint8_t w = 255;
 	i = i % ((w - b) * 2);
 	return b + (i <= (w - b) ? i : (w - b) * 2 - i);
 }
@@ -50,63 +51,57 @@ static void printChunk(const char *s, size_t n) {
 			x += 4;
 			break;
 		case '\n':
+			ansiiReset();
+			putchar('\n');
 			if (drawBold)
-				fputs("\x1b[0m\n\x1b[1m", stdout);
-			else
-				fputs("\x1b[0m\n", stdout);
+				ansiiBold();
 			x = 0;
 			++y;
 			break;
 		default: {
 			const int pos = x + y;
-			switch (color.mode) {
+			AnsiiColor color;
+			switch (textColor.mode) {
 			case ARGPARSE_COLOR_MODE_NORMAL:
 			case ARGPARSE_COLOR_MODE_RAINBOW:
 			case ARGPARSE_COLOR_MODE_RANDOM: {
 				const float freq = 0.1;
-				unsigned char r, g, b;
-				if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
-					r = clampedAddReflect(color.r,
+				uint8_t r, g, b;
+				if (textColor.mode == ARGPARSE_COLOR_MODE_NORMAL) {
+					r = clampedAddReflect(textColor.r,
 										  (sinf(pos * freq) * 127 + 128) / 3);
 					g = clampedAddReflect(
-						color.g,
+						textColor.g,
 						(sinf(pos * freq + 2 * M_PI / 3) * 127 + 128) / 3);
 					b = clampedAddReflect(
-						color.b,
+						textColor.b,
 						(sinf(pos * freq + 4 * M_PI / 3) * 127 + 128) / 3);
-				} else if (color.mode == ARGPARSE_COLOR_MODE_RAINBOW) {
+				} else if (textColor.mode == ARGPARSE_COLOR_MODE_RAINBOW) {
 					r = sinf(pos * freq) * 127 + 128;
 					g = sinf(pos * freq + 2 * M_PI / 3) * 127 + 128;
 					b = sinf(pos * freq + 4 * M_PI / 3) * 127 + 128;
-				} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
+				} else if (textColor.mode == ARGPARSE_COLOR_MODE_RANDOM) {
 					r = randGet(0, 255);
 					g = randGet(0, 255);
 					b = randGet(0, 255);
 				}
-				printf("\x1b[%c8;2;%u;%u;%um%c", colorInvert ? '4' : '3',
-					   (unsigned)r, (unsigned)g, (unsigned)b, c);
+				color = ansiiRGB(r, g, b);
 				break;
 			}
 			case ARGPARSE_COLOR_MODE_MONOCHROME:
-			case ARGPARSE_COLOR_MODE_BASIC: {
-				printf("\x1b[%c8;5;%dm%c", colorInvert ? '4' : '3',
-					   color.mode == ARGPARSE_COLOR_MODE_MONOCHROME
-						   ? colorsMonochrome(pos)
-						   : colorsBasic(pos),
-					   c);
+				color = ansii256(colorsMonochrome(pos));
+				break;
+			case ARGPARSE_COLOR_MODE_BASIC:
+				color = ansii256(colorsBasic(pos));
 				break;
 			}
-			}
+			ansiiColor(color, colorInvert);
+			putchar(c);
 			++x;
 			break;
 		}
 		}
 	}
-}
-
-static void printReset() {
-	fputs("\x1b[0m", stdout);
-	fflush(stdout);
 }
 
 static void doFile(const char *path) {
@@ -134,10 +129,10 @@ static void doFile(const char *path) {
 
 int main(int argc, char **argv) {
 	bool isHelp = false;
-	color = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_RAINBOW};
+	textColor = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_RAINBOW};
 	drawBold = false;
 	ArgparseParam params[] = {
-		ARGPARSE_HELP(&isHelp), ARGPARSE_COLOR("-c", "--color", &color),
+		ARGPARSE_HELP(&isHelp), ARGPARSE_COLOR("-c", "--color", &textColor),
 		ARGPARSE_FLAG("-i", "--invert", &colorInvert),
 		ARGPARSE_FLAG("-b", "--bold", &drawBold), ARGPARSE_END};
 
@@ -145,11 +140,11 @@ int main(int argc, char **argv) {
 	memset(consumed, false, sizeof(consumed));
 	argparse(argc, argv, params, consumed);
 
-	if (color.mode == ARGPARSE_COLOR_MODE_RANDOM)
+	if (textColor.mode == ARGPARSE_COLOR_MODE_RANDOM)
 		randInit();
 
 	if (drawBold)
-		fputs("\x1b[1m", stdout);
+		ansiiBold();
 
 	if (isHelp) {
 		const char help[] =
@@ -164,7 +159,8 @@ int main(int argc, char **argv) {
 			"\t-b --bold             Use bold\n"
 			"\n";
 		printChunk(help, sizeof(help));
-		printReset();
+		ansiiReset();
+		fflush(stdout);
 		return 0;
 	}
 
@@ -179,6 +175,7 @@ int main(int argc, char **argv) {
 	if (!hasArg)
 		doFile(NULL);
 
-	printReset();
+	ansiiReset();
+	fflush(stdout);
 	return 0;
 }
