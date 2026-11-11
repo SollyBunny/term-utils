@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 typedef struct __attribute__((packed, aligned(4))) {
 	uint8_t type;
@@ -10,6 +11,10 @@ typedef struct __attribute__((packed, aligned(4))) {
 	uint8_t g;
 	uint8_t b;
 } AnsiiColor;
+
+static inline bool ansiiColorEq(AnsiiColor a, AnsiiColor b) {
+	return memcmp(&a, &b, sizeof(a)) == 0;
+}
 
 static inline AnsiiColor ansiiRGB(uint8_t r, uint8_t g, uint8_t b) {
 	return (AnsiiColor){1, r, g, b};
@@ -28,9 +33,9 @@ static inline void ansiiColor(AnsiiColor color, bool bg) {
 			printf("\x1b[%c%cm", bg ? '4' : '3', '0' + color.r);
 		} else if (color.r >= 8 && color.r <= 15) {
 			if (bg)
-				printf("\x1b[10%cm", '0' + color.r);
+				printf("\x1b[10%cm", '0' + (color.r - 8));
 			else
-				printf("\x1b[9%cm", '0' + color.r);
+				printf("\x1b[9%cm", '0' + (color.r - 8));
 		} else {
 			printf("\x1b[%c8;5;%um", bg ? '4' : '3', color.r);
 		}

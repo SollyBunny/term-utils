@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/ansii.h"
 #include "lib/argparse.h"
 #include "lib/circ.h"
 #include "lib/rand.h"
@@ -10,7 +11,7 @@
 
 typedef ArgparseColor Color;
 
-static Color color;
+static Color snakeColor;
 
 static const int fruitValue = 5;
 static const int graceFrames = 3;
@@ -119,22 +120,21 @@ static void destroy() {
 	exit(0);
 }
 
-static int colorsRainbow(int i) {
-	static int colors[] = {196, 202, 208, 214, 220, 226, 190, 154, 118,
-						   82,	46,	 48,  49,  50,	51,	 45,  39,  33,
-						   27,	21,	 57,  93,  129, 165, 201};
-	static int colorSize = sizeof(colors) / (sizeof(colors[0]));
-	return colors[i % colorSize];
+static uint8_t colorsRainbow(int i) {
+	static uint8_t colors[] = {196, 202, 208, 214, 220, 226, 190, 154, 118,
+							   82,	46,	 48,  49,  50,	51,	 45,  39,  33,
+							   27,	21,	 57,  93,  129, 165, 201};
+	return colors[i % (sizeof(colors) / sizeof(colors[0]))];
 }
 
-static int colorsMonochrome(int i) {
-	const int b = 238;
-	const int w = 255;
+static uint8_t colorsMonochrome(int i) {
+	const uint8_t b = 238;
+	const uint8_t w = 255;
 	i = i % ((w - b) * 2);
 	return b + (i <= (w - b) ? i : (w - b) * 2 - i);
 }
 
-static unsigned char clampedAddReflect(unsigned char a, int b) {
+static uint8_t clampedAddReflect(unsigned char a, int b) {
 	const int res = (int)a + b;
 	if (res < 0)
 		return -res;
@@ -144,23 +144,22 @@ static unsigned char clampedAddReflect(unsigned char a, int b) {
 }
 
 static void draw() {
+	AnsiiColor colorOld = {};
 	// Draw snake
-	int lastColorHash = -1;
-	int colorHash;
 	for (int i = snake.len - 1; i >= 0; --i) {
+		AnsiiColor color;
 		const Pos *pos = &CIRC_INDEX(snake, Pos, i);
-		printf("\x1b[%d;%dH", pos->y + 1, pos->x * 2 + 1);
 		const int j = i / fruitValue;
-		switch (color.mode) {
+		switch (snakeColor.mode) {
 		case ARGPARSE_COLOR_MODE_NORMAL:
 		case ARGPARSE_COLOR_MODE_RANDOM: {
 			const int d = j % 2 == 0 ? -20 : 20;
-			unsigned char r, g, b;
-			if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
-				r = clampedAddReflect(color.r, d);
-				g = clampedAddReflect(color.g, d);
-				b = clampedAddReflect(color.b, d);
-			} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
+			uint8_t r, g, b;
+			if (snakeColor.mode == ARGPARSE_COLOR_MODE_NORMAL) {
+				r = clampedAddReflect(snakeColor.r, d);
+				g = clampedAddReflect(snakeColor.g, d);
+				b = clampedAddReflect(snakeColor.b, d);
+			} else if (snakeColor.mode == ARGPARSE_COLOR_MODE_RANDOM) {
 				unsigned h = snake.len / fruitValue;
 				h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
 				h ^= h >> 16;
@@ -170,48 +169,38 @@ static void draw() {
 				g = clampedAddReflect(h / 255 % 255, d);
 				b = clampedAddReflect(h / 255 / 255 % 255, d);
 			}
-			colorHash = (int)r + 255 * (int)g + 255 * 255 * (int)b;
-			if (colorHash != lastColorHash) {
-				lastColorHash = colorHash;
-				printf("\x1b[48;2;%u;%u;%um", (unsigned)r, (unsigned)g,
-					   (unsigned)b);
-			}
+			color = ansiiRGB(r, g, b);
 			break;
 		}
 		case ARGPARSE_COLOR_MODE_RAINBOW:
-		case ARGPARSE_COLOR_MODE_MONOCHROME: {
-			unsigned char c = color.mode == ARGPARSE_COLOR_MODE_RAINBOW
-								  ? colorsRainbow(j)
-								  : colorsMonochrome(j);
-			colorHash = c;
-			if (colorHash != lastColorHash) {
-				lastColorHash = colorHash;
-				printf("\x1b[48;5;%um", c);
-			}
+			color = ansii256(colorsRainbow(j));
+			break;
+		case ARGPARSE_COLOR_MODE_MONOCHROME:
+			color = ansii256(colorsMonochrome(j));
+			break;
+		case ARGPARSE_COLOR_MODE_BASIC:
+			color = ansii256(j % 2 == 0 ? 10 : 11);
 			break;
 		}
-		case ARGPARSE_COLOR_MODE_BASIC:
-			colorHash = j % 2;
-			if (colorHash != lastColorHash) {
-				lastColorHash = colorHash;
-				printf("\x1b[10%cm", j % 2 == 0 ? '2' : '3');
-			}
-			break;
+		ansiiMove(pos->x * 2, pos->y);
+		if (!ansiiColorEq(color, colorOld)) {
+			colorOld = color;
+			ansiiBg(color);
 		}
 		fputs("  ", stdout);
 	}
 
 	// Draw fruit
-	printf("\x1b[%d;%dH", fruitPos.y + 1, fruitPos.x * 2 + 1);
-	switch (color.mode) {
+	AnsiiColor color;
+	switch (snakeColor.mode) {
 	case ARGPARSE_COLOR_MODE_NORMAL:
 	case ARGPARSE_COLOR_MODE_RANDOM: {
 		unsigned char r, g, b;
-		if (color.mode == ARGPARSE_COLOR_MODE_NORMAL) {
-			r = color.r;
-			g = color.g;
-			b = color.b;
-		} else if (color.mode == ARGPARSE_COLOR_MODE_RANDOM) {
+		if (snakeColor.mode == ARGPARSE_COLOR_MODE_NORMAL) {
+			r = snakeColor.r;
+			g = snakeColor.g;
+			b = snakeColor.b;
+		} else if (snakeColor.mode == ARGPARSE_COLOR_MODE_RANDOM) {
 			unsigned h = snake.len;
 			h ^= h + 0x9e3779b9u + (h << 6) + (h >> 2);
 			h ^= h >> 16;
@@ -221,20 +210,22 @@ static void draw() {
 			g = h / 255 % 255;
 			b = h / 255 / 255 % 255;
 		}
-		printf("\x1b[48;2;%u;%u;%um  ", (unsigned)r, (unsigned)g, (unsigned)b);
+		color = ansiiRGB(r, g, b);
 		break;
 	}
 	case ARGPARSE_COLOR_MODE_RAINBOW:
+		color = ansii256(colorsRainbow(snake.len / fruitValue));
+		break;
 	case ARGPARSE_COLOR_MODE_MONOCHROME:
-		printf("\x1b[48;5;%dm  ",
-			   color.mode == ARGPARSE_COLOR_MODE_RAINBOW
-				   ? colorsRainbow(snake.len / fruitValue)
-				   : colorsMonochrome(snake.len / fruitValue));
+		color = ansii256(colorsMonochrome(snake.len / fruitValue));
 		break;
 	case ARGPARSE_COLOR_MODE_BASIC:
-		printf("\x1b[101m  ");
+		color = ansii256(9);
 		break;
 	}
+	ansiiMove(fruitPos.x * 2, fruitPos.y);
+	ansiiFg(color);
+	fputs("  ", stdout);
 }
 
 static bool play() {
@@ -310,8 +301,9 @@ static bool play() {
 		if (score > 0)
 			snprintf(scoreStr, sizeof(scoreStr), "%d", score);
 
-		printf("\x1b[0m\x1b[2J");
-		printf("\x1b[48;5;244m");
+		ansiiReset();
+		ansiiClearScreen();
+		ansiiBg(ansii256(244));
 		drawText(termSize.w / 2, termSize.h / 2, scoreStr, true);
 		draw();
 		fflush(stdout);
@@ -320,10 +312,10 @@ static bool play() {
 
 int main(int argc, char **argv) {
 	bool isHelp = false;
-	color = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
+	snakeColor = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
 
 	ArgparseParam params[] = {ARGPARSE_HELP(&isHelp),
-							  ARGPARSE_COLOR("-c", "--color", &color),
+							  ARGPARSE_COLOR("-c", "--color", &snakeColor),
 							  ARGPARSE_END};
 
 	argparse(argc, argv, params, NULL);
@@ -352,22 +344,26 @@ int main(int argc, char **argv) {
 	while (true) {
 		const bool win = play();
 
-		printf("\x1b[0m\x1b[2J");
+		ansiiReset();
+		ansiiClearScreen();
 		draw();
 		if (win) {
-			printf("\x1b[0m\x1b[%d;0HYou Win! Want to restart? (y/n)",
-				   sizeY + 1);
-			printf("\x1b[42m");
+			ansiiReset();
+			ansiiMove(0, sizeY);
+			fputs("You Win! Want to restart? (y/n)", stdout);
+			ansiiBg(ansii256(2));
 			drawText(termSize.w / 2, termSize.h / 2, "YOU WIN!", true);
 		} else {
-			printf("\x1b[0m\x1b[%d;0HYou Died! Want to restart? (y/n)",
-				   sizeY + 1);
-			printf("\x1b[41m");
+			ansiiReset();
+			ansiiMove(0, sizeY);
+			fputs("You Died! Want to restart? (y/n)", stdout);
+			ansiiBg(ansii256(1));
 			drawText(termSize.w / 2, termSize.h / 2, "YOU DIED!", true);
 			const char *deathMsg = DEATH_MSGS[randGet(
 				0, sizeof(DEATH_MSGS) / sizeof(DEATH_MSGS[0]) - 1)];
-			printf("\x1b[0m\x1b[%d;%dH%s", sizeY / 2 + 4,
-				   sizeX - ((int)strlen(deathMsg) / 2), deathMsg);
+			ansiiReset();
+			ansiiMove(sizeX - ((int)strlen(deathMsg) / 2), sizeY / 2 + 3);
+			fputs(deathMsg, stdout);
 		}
 		fflush(stdout);
 
