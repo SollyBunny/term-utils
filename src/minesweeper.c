@@ -1,10 +1,12 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "lib/ansii.h"
 #include "lib/rand.h"
 #include "lib/term.h"
 
-static const unsigned TILE_COLORS[] = {0, 21, 28, 124, 17, 52, 32, 255, 240};
+static const uint8_t TILE_COLORS[] = {0, 21, 28, 124, 17, 52, 32, 255, 240};
 
 enum State {
 	STATE_NONE = 0,
@@ -14,7 +16,7 @@ enum State {
 
 typedef struct {
 	// 9 == bomb, 0-8 == number of bombs next to this tile
-	unsigned char bomb;
+	uint8_t bomb;
 	enum State state;
 } Tile;
 static Tile *grid;
@@ -38,42 +40,40 @@ static bool isState(int x, int y, enum State state) {
 
 static void drawTile(int x, int y, bool cursor) {
 	const Tile *tile = &grid[y * sizeX + x];
-	printf("\x1b[%u;%uH", y + 1, x * 2 + 1);
-	printf("\x1b[0m");
-	printf("\x1b[1m");
+	ansiiReset();
+	ansiiMove(x * 2, y);
 	switch (tile->state) {
 	case STATE_NONE:
-		if (cursor)
-			printf("\x1b[48;5;231m  ");
-		else
-			printf("\x1b[48;5;237m  ");
+		ansiiBg(ansii256(cursor ? 231 : 237));
+		fputs("  ", stdout);
 		break;
 	case STATE_UNCOVERED:
+		ansiiBold();
 		if (cursor)
-			printf("\x1b[48;5;231m");
-		else
-			printf("\x1b[0m");
-		if (tile->bomb == 0)
-			printf("  ");
-		else if (tile->bomb == 9)
-			printf("ꓘk");
-		else
-			printf("\x1b[38;5;%um%u ", TILE_COLORS[tile->bomb], tile->bomb);
+			ansiiBg(ansii256(231));
+		if (tile->bomb == 0) {
+			fputs("  ", stdout);
+		} else if (tile->bomb >= 9) {
+			ansiiFg(ansii256(196));
+			fputs("ꓘk", stdout);
+		} else {
+			ansiiFg(ansii256(TILE_COLORS[tile->bomb]));
+			printf("%u ", tile->bomb);
+		}
 		break;
 	case STATE_FLAG:
-		if (cursor)
-			printf("\x1b[48;5;231m");
-		else
-			printf("\x1b[48;5;237m");
-		printf("\x1b[38;5;196m|>");
+		ansiiBold();
+		ansiiBg(ansii256(cursor ? 231 : 237));
+		ansiiFg(ansii256(196));
+		fputs("|>", stdout);
 		break;
 	}
 }
 
 static void drawAll() {
-	printf("\x1b[48;5;237m");				  // BG Gray
-	printf("\x1b[%d;0H\x1b[1J\x1b[K", sizeY); // Clear screen
-	printf("\x1b[0m");						  // Reset
+	ansiiBg(ansii256(237));
+	ansiiMove(sizeX * 2, sizeY + 1);
+	ansiiClearCursorToStart();
 	for (int y = 0; y < sizeY; ++y) {
 		for (int x = 0; x < sizeX; ++x) {
 			if (!isState(x, y, STATE_NONE))
@@ -146,9 +146,9 @@ int main() {
 		}
 	}
 
-	printf("\x1b[48;5;237m");				  // BG Gray
-	printf("\x1b[%d;0H\x1b[1J\x1b[K", sizeY); // Clear screen
-	printf("\x1b[0m");						  // Reset
+	ansiiBg(ansii256(237));
+	ansiiMove(sizeX * 2, sizeY + 1);
+	ansiiClearCursorToStart();
 	drawTile(cursorX, cursorY, true);
 	fflush(stdout);
 
@@ -176,13 +176,12 @@ int main() {
 			const int line2Size = snprintf(
 				line2, sizeof(line2), "needs %d x %d", sizeX * 2, sizeY + 1);
 
-			printf("\x1b[0m"); // Reset
-			printf("\x1b[2J"); // Clear screen
-			printf("\x1b[%d;%dH%s", termSize.h / 2 + 1,
-				   termSize.w / 2 + 1 - (int)sizeof(line1) / 2, line1);
-			printf("\x1b[%d;%dH%s", termSize.h / 2 + 1 + 1,
-				   termSize.w / 2 + 1 - line2Size / 2, line2);
-
+			ansiiReset();
+			ansiiClearScreen();
+			ansiiMove(termSize.w / 2 - (int)sizeof(line1) / 2, termSize.h / 2);
+			fputs(line1, stdout);
+			ansiiMove(termSize.w / 2 - line2Size / 2, termSize.h / 2 + 1);
+			fputs(line2, stdout);
 			fflush(stdout);
 			continue;
 		} else if (wasTooSmall) {

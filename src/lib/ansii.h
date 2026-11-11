@@ -44,6 +44,7 @@ static inline void ansiiReset() { fputs("\x1b[0m", stdout); }
 static inline void ansiiResetFg() { fputs("\x1b[39m", stdout); }
 static inline void ansiiResetBg() { fputs("\x1b[49m", stdout); }
 static inline void ansiiClearScreen() { fputs("\x1b[2J", stdout); }
+static inline void ansiiClearCursorToStart() { fputs("\x1b[1J", stdout); }
 static inline void ansiiBold() { fputs("\x1b[1m", stdout); }
 
 static inline void ansiiMove(int x, int y) {
