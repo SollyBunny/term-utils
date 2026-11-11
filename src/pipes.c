@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "lib/ansii.h"
 #include "lib/argparse.h"
 #include "lib/rand.h"
 #include "lib/term.h"
@@ -78,28 +79,25 @@ static void pipeSim(Pipe *pipe) {
 }
 
 static void pipeDraw(const Pipe *pipe) {
-	printf("\x1b[%d;%dH", pipe->pos.y + 1, pipe->pos.x + 1);
+	ansiiMove(pipe->pos.x, pipe->pos.y);
 	switch (pipeColor.mode) {
 	case ARGPARSE_COLOR_MODE_NORMAL:
-		printf("\x1b[38;2;%u;%u;%um", pipeColor.r, pipeColor.g, pipeColor.b);
+		ansiiFg(ansiiRGB(pipeColor.r, pipeColor.g, pipeColor.b));
 		break;
 	case ARGPARSE_COLOR_MODE_MONOCHROME:
-		printf("\x1b[38;5;%dm", pipe->nonce % (255 - 232 + 1) + 232);
+		ansiiFg(ansii256(pipe->nonce % (255 - 232 + 1) + 232));
 		break;
 	case ARGPARSE_COLOR_MODE_RAINBOW:
-		printf(
-			"\x1b[38;2;%u;%u;%um",
-			(unsigned int)(sinf((float)pipe->nonce) * 127 + 128),
-			(unsigned int)(sinf((float)pipe->nonce + 2 * M_PI / 3) * 127 + 128),
-			(unsigned int)(sinf((float)pipe->nonce + 4 * M_PI / 3) * 127 +
-						   128));
+		ansiiFg(ansiiRGB(sinf((float)pipe->nonce) * 127 + 128,
+						 sinf((float)pipe->nonce + 2 * M_PI / 3) * 127 + 128,
+						 sinf((float)pipe->nonce + 4 * M_PI / 3) * 127 + 128));
 		break;
 	case ARGPARSE_COLOR_MODE_RANDOM:
-		printf("\x1b[38;2;%u;%u;%um", pipe->nonce % 255,
-			   pipe->nonce / 255 % 255, pipe->nonce / 255 / 255 % 255);
+		ansiiFg(ansiiRGB(pipe->nonce % 255, pipe->nonce / 255 % 255,
+						 pipe->nonce / 255 / 255 % 255));
 		break;
 	case ARGPARSE_COLOR_MODE_BASIC:
-		printf("\x1b[3%cm", pipe->nonce % ('6' - '1' + 1) + '1');
+		ansiiFg(ansii256(pipe->nonce % (6 - 1 + 1) + 1));
 		break;
 	}
 	fputs(pipeChars[pipe->charIndex], stdout);
