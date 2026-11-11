@@ -247,75 +247,62 @@ static bool play() {
 	// Create fruit
 	placeFruit();
 
-	// Draw first frame of board
-	printf("\x1b[0m\x1b[2J");
-	draw();
-	fflush(stdout);
-
 	int grace = 0;		// Grace frames
 	Pos dir = DIR_NONE; // dx and dy
 	while (true) {
 		sleepStable(delaySeconds);
 		TermEvent event = termGetEvent();
-		Pos newDir = DIR_NONE;
+		Pos newDir = dir;
 		if (event.type == TERM_EVENT_INTERUPT) {
 			destroy();
 		} else if (event.type == TERM_EVENT_RESIZED) {
 			/* TODO */
 		} else if (event.type == TERM_EVENT_PAUSED) {
-			dir = DIR_NONE;
+			newDir = dir = DIR_NONE;
 		} else if (event.type == TERM_EVENT_KEY) {
 			newDir = charToDir(event.data.key);
+			if (posEqual(newDir, posFlip(dir)))
+				newDir = dir;
 		}
 
-		// If invalid/no input or opposite input
-		if (posEqual(newDir, DIR_NONE) || posEqual(newDir, posFlip(dir))) {
-			// Can't do anything with no input
-			if (posEqual(dir, DIR_NONE)) {
-				printf("\x1b[0m\x1b[2J");
-				draw();
-				fflush(stdout);
+		if (!posEqual(newDir, DIR_NONE)) {
+			bool collided = false;
+			Pos snakeNew = posAdd(CIRC_INDEX(snake, Pos, 0), newDir);
+
+			if (doCollisionWithSnakeAndBorder(&snakeNew)) {
+				// If collision was result of direction change, undo it and try
+				// again
+				newDir = dir;
+				snakeNew = posAdd(CIRC_INDEX(snake, Pos, 0), newDir);
+				collided = doCollisionWithSnakeAndBorder(&snakeNew);
+			}
+
+			if (collided) {
+				grace += 1;
+				if (grace >= graceFrames)
+					return false;
 				continue;
 			}
-			newDir = dir;
-		}
 
-		bool collided = false;
-		Pos snakeNew = posAdd(CIRC_INDEX(snake, Pos, 0), newDir);
+			dir = newDir;
+			grace = 0;
 
-		if (doCollisionWithSnakeAndBorder(&snakeNew)) {
-			// If collision was result of direction change, undo it and try
-			// again
-			newDir = dir;
-			snakeNew = posAdd(CIRC_INDEX(snake, Pos, 0), newDir);
-			collided = doCollisionWithSnakeAndBorder(&snakeNew);
-		}
+			// Move all snake peices along by one
+			circPopBack(&snake);
+			*((Pos *)circAddFront(&snake)) = snakeNew;
 
-		if (collided) {
-			grace += 1;
-			if (grace >= graceFrames)
-				return false;
-			continue;
-		}
+			// Fruit collision
+			if (posEqual(snakeNew, fruitPos)) {
+				if (snake.len + fruitValue >= (size_t)(sizeX * sizeY))
+					return true;
 
-		dir = newDir;
-		grace = 0;
+				placeFruit();
 
-		// Move all snake peices along by one
-		circPopBack(&snake);
-		*((Pos *)circAddFront(&snake)) = snakeNew;
-
-		// Fruit collision
-		if (posEqual(snakeNew, fruitPos)) {
-			if (snake.len + fruitValue >= (size_t)(sizeX * sizeY))
-				return true;
-
-			placeFruit();
-
-			// Add new snake bits
-			const Pos snakeEnd = CIRC_INDEX(snake, Pos, snake.len - 1);
-			for (size_t i = 0; i < (size_t)fruitValue; ++i)
-				*((Pos *)circAddBack(&snake)) = snakeEnd;
+				// Add new snake bits
+				const Pos snakeEnd = CIRC_INDEX(snake, Pos, snake.len - 1);
+				for (size_t i = 0; i < (size_t)fruitValue; ++i)
+					*((Pos *)circAddBack(&snake)) = snakeEnd;
+			}
 		}
 
 		const int score = ((int)snake.len - initialSnakeLen) / fruitValue;
