@@ -7,9 +7,7 @@
 #include "lib/argparse.h"
 #include "lib/rand.h"
 
-typedef ArgparseColor Color;
-
-static Color textColor;
+static ArgparseColor textColor;
 static bool colorInvert;
 static bool drawBold;
 
@@ -146,7 +144,7 @@ static void doFile(const char *path) {
 
 int main(int argc, char **argv) {
 	bool isHelp = false;
-	textColor = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_RAINBOW};
+	textColor = (ArgparseColor){0, 0, 0, ARGPARSE_COLOR_MODE_RAINBOW};
 	drawBold = false;
 	ArgparseParam params[] = {
 		ARGPARSE_HELP(&isHelp), ARGPARSE_COLOR("-c", "--color", &textColor),

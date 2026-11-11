@@ -8,13 +8,11 @@
 #include "lib/rand.h"
 #include "lib/term.h"
 
-typedef ArgparseColor Color;
-
 static float density;
 static int lineLength;
 static int lineGap;
 static bool english;
-static Color lineColor;
+static ArgparseColor lineColor;
 static int colorVariation;
 
 static const char *ENGLISH_CHARS[] = {
@@ -215,7 +213,7 @@ int main(int argc, char **argv) {
 	float frameDelay = 0.05;
 	lineLength = 15;
 	density = 0.5;
-	lineColor = (Color){100, 255, 100, ARGPARSE_COLOR_MODE_NORMAL};
+	lineColor = (ArgparseColor){100, 255, 100, ARGPARSE_COLOR_MODE_NORMAL};
 	colorVariation = 50;
 	english = false;
 	ArgparseParam params[] = {

@@ -9,9 +9,7 @@
 #include "lib/term.h"
 #include "lib/text.h"
 
-typedef ArgparseColor Color;
-
-static Color snakeColor;
+static ArgparseColor snakeColor;
 
 static const int fruitValue = 5;
 static const int graceFrames = 3;
@@ -312,7 +310,7 @@ static bool play() {
 
 int main(int argc, char **argv) {
 	bool isHelp = false;
-	snakeColor = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
+	snakeColor = (ArgparseColor){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
 
 	ArgparseParam params[] = {ARGPARSE_HELP(&isHelp),
 							  ARGPARSE_COLOR("-c", "--color", &snakeColor),

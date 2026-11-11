@@ -7,9 +7,7 @@
 #include "lib/rand.h"
 #include "lib/term.h"
 
-typedef ArgparseColor Color;
-
-static Color pipeColor;
+static ArgparseColor pipeColor;
 static int colorVariation;
 static const char **pipeChars;
 
@@ -125,7 +123,7 @@ int main(int argc, char **argv) {
 	bool isHelp = false;
 	float frameDelay = 0.05;
 	int pipeSet = 2;
-	pipeColor = (Color){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
+	pipeColor = (ArgparseColor){0, 0, 0, ARGPARSE_COLOR_MODE_BASIC};
 	colorVariation = 50;
 	ArgparseParam params[] = {
 		ARGPARSE_HELP(&isHelp), ARGPARSE_INT("-t", "--set", &pipeSet, 0, 9),
