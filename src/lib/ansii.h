@@ -47,5 +47,5 @@ static inline void ansiiClearScreen() { fputs("\x1b[2J", stdout); }
 static inline void ansiiBold() { fputs("\x1b[1m", stdout); }
 
 static inline void ansiiMove(int x, int y) {
-	printf("\x1b[%d;%dH\n", y + 1, x + 1);
+	printf("\x1b[%d;%dH", y + 1, x + 1);
 }

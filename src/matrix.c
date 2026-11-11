@@ -1,7 +1,9 @@
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "lib/ansii.h"
 #include "lib/argparse.h"
 #include "lib/rand.h"
 #include "lib/term.h"
@@ -45,7 +47,7 @@ static Line *lines = NULL;
 // How long it's been since the last in each col
 static int *lineGaps = NULL;
 
-static unsigned char randomizeColorComponent(unsigned char c) {
+static uint8_t randomizeColorComponent(uint8_t c) {
 	int delta = randGet(-colorVariation / 2, colorVariation / 2);
 	int result = c + delta;
 
@@ -54,7 +56,7 @@ static unsigned char randomizeColorComponent(unsigned char c) {
 	if (result > 255)
 		result = 255;
 
-	return (unsigned char)result;
+	return (uint8_t)result;
 }
 
 static const char *randomChar(void) {
@@ -74,38 +76,33 @@ static void lineSim(Line *line) {
 }
 
 static void lineDrawDot(const Line *line, int y) {
-	printf("\x1b[%u;%uH", y + 1, line->x + 1);
+	ansiiMove(line->x, y);
 	switch (lineColor.mode) {
-	case ARGPARSE_COLOR_MODE_NORMAL: {
-		printf("\x1b[38;2;%u;%u;%um", randomizeColorComponent(lineColor.r),
-			   randomizeColorComponent(lineColor.g),
-			   randomizeColorComponent(lineColor.b));
+	case ARGPARSE_COLOR_MODE_NORMAL:
+		ansiiFg(ansiiRGB(randomizeColorComponent(lineColor.r),
+						 randomizeColorComponent(lineColor.g),
+						 randomizeColorComponent(lineColor.b)));
 		break;
-	}
-	case ARGPARSE_COLOR_MODE_MONOCHROME: {
-		const unsigned val = randomizeColorComponent(line->nonce % 255);
-		printf("\x1b[38;2;%u;%u;%um", val, val, val);
+	case ARGPARSE_COLOR_MODE_MONOCHROME:
+		ansiiFg(
+			ansiiRGB(line->nonce % 255, line->nonce % 255, line->nonce % 255));
 		break;
-	}
 	case ARGPARSE_COLOR_MODE_RAINBOW: {
 		const float pos = (float)line->x / (float)termSize.w * M_PI * 2;
-		printf("\x1b[38;2;%u;%u;%um",
-			   randomizeColorComponent(sinf(pos) * 127 + 128),
-			   randomizeColorComponent(sinf(pos + 2 * M_PI / 3) * 127 + 128),
-			   randomizeColorComponent(sinf(pos + 4 * M_PI / 3) * 127 + 128));
+		ansiiFg(ansiiRGB(
+			randomizeColorComponent(sinf(pos) * 127 + 128),
+			randomizeColorComponent(sinf(pos + 2 * M_PI / 3) * 127 + 128),
+			randomizeColorComponent(sinf(pos + 4 * M_PI / 3) * 127 + 128)));
 		break;
 	}
-	case ARGPARSE_COLOR_MODE_RANDOM: {
-		printf("\x1b[38;2;%u;%u;%um",
-			   randomizeColorComponent(line->nonce % 255),
-			   randomizeColorComponent(line->nonce / 255 % 255),
-			   randomizeColorComponent(line->nonce / 255 / 255 % 255));
+	case ARGPARSE_COLOR_MODE_RANDOM:
+		ansiiFg(ansiiRGB(randomizeColorComponent(line->nonce & 255),
+						 randomizeColorComponent(line->nonce >> 8 & 255),
+						 randomizeColorComponent(line->nonce >> 16 & 255)));
 		break;
-	}
-	case ARGPARSE_COLOR_MODE_BASIC: {
-		printf("\x1b[3%cm", line->nonce % ('6' - '1' + 1) + '1');
+	case ARGPARSE_COLOR_MODE_BASIC:
+		ansiiFg(ansii256(line->nonce % (6 - 1 + 1) + 1));
 		break;
-	}
 	}
 	fputs(randomChar(), stdout);
 }
@@ -126,9 +123,8 @@ static void lineDraw(const Line *line) {
 		lineDrawDot(line, line->y);
 
 	if (line->y >= line->l && line->y - line->l < termSize.h) {
-		printf("\x1b[%u;%uH"
-			   " ",
-			   line->y - line->l + 1, line->x + 1);
+		ansiiMove(line->x, line->y - line->l);
+		putchar(' ');
 	}
 }
 
