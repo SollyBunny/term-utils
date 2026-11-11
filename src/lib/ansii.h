@@ -40,15 +40,11 @@ static inline void ansiiColor(AnsiiColor color, bool bg) {
 static inline void ansiiFg(AnsiiColor color) { ansiiColor(color, false); }
 static inline void ansiiBg(AnsiiColor color) { ansiiColor(color, true); }
 
-static inline void ansiiReset() { printf("\x1b[0m"); }
-
-static inline void ansiiResetFg() { printf("\x1b[39m"); }
-
-static inline void ansiiResetBg() { printf("\x1b[49m"); }
-
-static inline void ansiiClearScreen() { printf("\x1b[2J"); }
-
-static inline void ansiiBold() { printf("\x1b[1m"); }
+static inline void ansiiReset() { fputs("\x1b[0m", stdout); }
+static inline void ansiiResetFg() { fputs("\x1b[39m", stdout); }
+static inline void ansiiResetBg() { fputs("\x1b[49m", stdout); }
+static inline void ansiiClearScreen() { fputs("\x1b[2J", stdout); }
+static inline void ansiiBold() { fputs("\x1b[1m", stdout); }
 
 static inline void ansiiMove(int x, int y) {
 	printf("\x1b[%d;%dH\n", y + 1, x + 1);
