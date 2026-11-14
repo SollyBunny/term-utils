@@ -99,6 +99,7 @@ static inline AnsiiColor getColor(int x, int y, uint8_t n) {
 			return ansii256(10);
 		return ansii256(11);
 	}
+	abort();
 }
 
 static void handleResize(TermSize termSize) {
